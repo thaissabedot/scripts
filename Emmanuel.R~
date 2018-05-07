@@ -1,0 +1,109 @@
+library(Biobase) 
+library(GEOquery)
+
+gset <- getGEO("GSE40360", GSEMatrix =TRUE)[[1]]
+gset.expr <- exprs(gset) #dados
+gset.pdata <- pData(gset) #dados clínicos
+
+
+
+chr17:71580487-71586168 #GALR2
+
+chr18:73078440-73123640 #GALR1
+
+chr11:68206893-68216884 #GAL
+
+library(Gviz)		   	 
+a <- AnnotationTrack(start=68206893, end=68216884,chromosome="chr11", genome="hg18", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg18", chromosome = "chr11")
+
+knownGenes <- UcscTrack(genome = "hg18", chromosome = "chr11", track = "knownGene", from = 68206893, to = 68216884, trackType = "GeneRegionTrack",rstarts = "exonStarts", rends = "exonEnds", gene = "name",symbol = "name", transcript = "name", strand = "strand",fill = "#8282d2", name = "UCSC Genes")
+
+symbol(knownGenes) <- c("GAL","GAL","GAL","GAL","GAL","GAL")
+
+cpgIslands <- UcscTrack(genome = "hg18", chromosome = "chr11",track = "cpgIslandExt", from = 68206893, to = 68216884,trackType = "AnnotationTrack", start = "chromStart",end = "chromEnd", id = "name", shape = "box",fill = "#006400", name = "CpG Islands")
+
+library(FDb.InfiniumMethylation.hg18)
+InfiniumMethylation <- features(FDb.InfiniumMethylation.hg18)
+gr <- GRanges(seqnames = "chr17",ranges = IRanges(start = 71580487, end=71586168))
+a <- as.data.frame(InfiniumMethylation)
+a <- merge(a[,1:3],gset.expr,by=0)
+rownames(a) <- as.character(a$Row.names)
+a <- a[,-1]
+
+b <- subsetByOverlaps(makeGRangesFromDataFrame(a,TRUE),gr)
+anno.450k <- AnnotationTrack(b, name = "450k probes")
+
+#check the groups: identical(colnames(a)[4:50],as.character(gset.pdata$geo_accession)) TRUE
+
+data.450 <- DataTrack(b,name="450k",type="smooth",groups=c(rep("Multiple sclerosis",28),rep("Control",19)),col=c("black","red"))
+
+pdf("/home/thais/GAL.pdf",width=20, height=11)
+plotTracks(list(itrack,gtrack,cpgIslands,knownGenes,anno.450k,data.450),showId=TRUE,legend=TRUE)
+dev.off()
+
+b <- as.data.frame(b)
+b <- b[with(b,order(seqnames,start)),]
+
+c <- b[,-c(1:5)]
+c[is.na(c)] <- min(c,na.rm=TRUE)+100
+order <- c(hclust(dist(t(c[,1:28])))$order,(hclust(dist(t(c[,29:47])))$order)+28)
+dend1 <- as.dendrogram(hclust(dist(t(c[,1:28]))))
+dens2 <- as.dendrogram(hclust(dist(t(c[,29:47]))))
+c <- b[,-c(1:5)]
+#c <- c[,order]
+
+
+ha1 = HeatmapAnnotation(df = data.frame(Sample = c(rep("Multiple sclerosis",28),rep("Control",19))), 
+    col = list(Sample = c("Multiple sclerosis" =  "red", "Control" = "black")))
+
+pdf("/home/thais/GAL_heatmap.pdf",width=15, height=10)
+Heatmap(as.matrix(c), name = "DNA methylation values", col=jet.colors(75),cluster_rows = FALSE, cluster_columns = FALSE,top_annotation = ha1)
+dev.off()
+
+densityHeatmap(as.matrix(c), anno = ha1)
+
+
+h1 <- Heatmap(as.matrix(c[,1:28]), name = "DNA methylation values", col=jet.colors(75),cluster_rows = FALSE,cluster_columns=dend1)
+h2 <- Heatmap(as.matrix(c[,29:47]), name = "DNA methylation values", col=jet.colors(75),cluster_rows = FALSE,cluster_columns=dens2)
+pdf("/home/thais/GALR2_heatmap_den.pdf",width=15, height=10)
+h1+h2
+dev.off()
+
+
+
+probes <- read.table("/home/thais/Downloads/DMR_paper_Emmanuel.txt")
+pca.meta <- data.frame(Sample = c(rep("Multiple sclerosis",28),rep("Control",19)))
+
+pca <- gset.expr[as.character(probes$V1),]  #2423
+
+pca.data <- prcomp(t(pca), scales=TRUE,na.action="exclude") #calcula o principal components analysis
+scores <- data.frame(pca.meta, pca.data$x[, 1:3]) #lgg.pca$x[, 1:3] means that estamos utilizando os 3 primeiros PCs
+#para checar lgg.pca:
+#summary(lgg.pca)
+#plot(lgg.pca) (Scree Plot)
+
+
+library(ggplot2)
+#png((filename = "/dados/ResearchProjects/tathi/TCGA_LGG_Recurrent/Images/PCAnew", res=300, width=2000, height=2000))
+qplot(x=PC1, y=PC2, data=scores, color=factor(pca.meta$Sample)) + 
+  ggtitle("PCA Plot") + 
+  geom_point(size = 4,aes(shape=factor(pca.meta$Sample))) +
+  #scale_color_discrete(name="recurrentVSprimmary") + 
+  #scale_color_discrete(name="primary-recurrent") + 
+  scale_color_manual(values=c("green", "red", "purple","orange","yellow","blue","lightblue","salmon","lightpink4","tomato4","magenta"), 
+                    # breaks=c("LGm1","LGm2","LGm3","LGm4","LGm5","LGm6","non-tumor","Sturm et al., 2012","Lambert et al., 2013","Turcan et al., 2012","Mur et al., 2013"), # color scale (for points) 
+                     labels=c("LGm1","LGm2","LGm3","LGm4","LGm5","LGm6","non-tumor","Sturm et al., 2012","Lambert et al., 2013","Turcan et al., 2012","Mur et al., 2013"),
+                     name="Legend") 
+
+means <- apply(gset.expr[,],1,mean,na.rm=TRUE)
+means <- as.data.frame(means)
+hyper <- apply(gset.expr[as.character(probes[1:1292,"V1"]),],1,mean,na.rm=TRUE)
+hypo <- apply(gset.expr[as.character(probes[-c(1:1292),"V1"]),],1,mean,na.rm=TRUE)
+
+png("/home/thais/density.png",width = 1000, height = 1000)
+plotDensity(means$means, xlim=c(-0.1,1.1),ylim=c(0,4),xlab="Illumina Methylation Level",ylab="Density")
+plotDensity(hypo,add=TRUE,col="red")
+plotDensity(hyper,add=TRUE,col="green")
+dev.off()

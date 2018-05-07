@@ -1,0 +1,3936 @@
+ids.mut <- c("TCGA-06-0128","TCGA-16-1460","TCGA-19-1788")
+ids.wt <- c("TCGA-14-1454","TCGA-14-3477","TCGA-14-1401")
+
+load("/home/thais/LGG-GBM/LGG-GBM.merged.data.FB20150930v3.Rdata") #pdata from Sep 2015 (LGG-GBM project). Created by Floris Barthel
+rownames(pd) <- as.character(pd$case.id)
+
+manifest <- read.delim("/home/thais/GBM WGBS/file_manifest.txt")
+manifest <- manifest[manifest$File.Name %in% list.files("/home/thais/GBM WGBS/Methylation_-_Bisulfite_Sequencing/JHU_USC__IlluminaHiSeq_WGBS/Level_3/"),]
+manifest$Sample <- substr(as.character(manifest$Sample),1,12)
+
+metadata <- pd[substr(as.character(manifest$Barcode),1,12),]
+#id.mut <- subset(metadata, IDH.status == "Mutant")$case.id
+#id.wt <- subset(metadata, IDH.status == "WT")$case.id
+
+as.character(manifest[manifest$Sample %in% as.character(ids.mut),"File.Name"])
+
+TCGA.06.0128 <- read.table(as.character(manifest[manifest$Sample %in% as.character(ids.mut),"File.Name"])[1])
+TCGA.16.1460 <- read.table(as.character(manifest[manifest$Sample %in% as.character(ids.mut),"File.Name"])[2])
+TCGA.19.1788 <- read.table(as.character(manifest[manifest$Sample %in% as.character(ids.mut),"File.Name"])[3])
+
+TCGA.06.0128 <- TCGA.06.0128[-1,]
+TCGA.16.1460 <- TCGA.16.1460[-1,]
+TCGA.19.1788 <- TCGA.19.1788[-1,]
+
+colnames(TCGA.06.0128) <- c("chrom","start","end","name","score","strand","percentMeth","numCTreads")
+colnames(TCGA.16.1460) <- c("chrom","start","end","name","score","strand","percentMeth","numCTreads")
+colnames(TCGA.19.1788) <- c("chrom","start","end","name","score","strand","percentMeth","numCTreads")
+
+save(TCGA.06.0128,TCGA.16.1460,TCGA.19.1788,file="IDHmut_3samples.rda")
+
+library(GenomicRanges) 
+TCGA.06.0128.GR <- GRanges(seqnames = as.character(TCGA.06.0128$chrom),ranges = IRanges(start = as.numeric(as.character(TCGA.06.0128$start)), end=as.numeric(as.character(TCGA.06.0128$end))),percentMeth=as.numeric(as.character(TCGA.06.0128$percentMeth))) #26.790.506
+TCGA.16.1460.GR <- GRanges(seqnames = as.character(TCGA.16.1460$chrom),ranges = IRanges(start = as.numeric(as.character(TCGA.16.1460$start)), end=as.numeric(as.character(TCGA.16.1460$end))),percentMeth=as.numeric(as.character(TCGA.16.1460$percentMeth))) #26.709.554
+TCGA.19.1788.GR <- GRanges(seqnames = as.character(TCGA.19.1788$chrom),ranges = IRanges(start = as.numeric(as.character(TCGA.19.1788$start)), end=as.numeric(as.character(TCGA.19.1788$end))),percentMeth=as.numeric(as.character(TCGA.19.1788$percentMeth))) #26.842.954
+
+overlaps <- Reduce(subsetByOverlaps, list(TCGA.06.0128.GR, TCGA.16.1460.GR, TCGA.19.1788.GR)) #25.558.387
+
+TCGA.06.0128$numCTreads <- as.numeric(as.character(TCGA.06.0128$numCTreads))
+m <- ggplot(TCGA.06.0128, aes(x=numCTreads))
+m + geom_histogram(binwidth = 1)
+
+TCGA.16.1460$numCTreads <- as.numeric(as.character(TCGA.16.1460$numCTreads))
+m <- ggplot(TCGA.16.1460, aes(x=numCTreads))
+m + geom_histogram(binwidth = 1)
+
+TCGA.19.1788$numCTreads <- as.numeric(as.character(TCGA.19.1788$numCTreads))
+m <- ggplot(TCGA.19.1788, aes(x=numCTreads))
+m + geom_histogram(binwidth = 1)
+
+load("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RandomForest.calls/GCIMPlow.90probes.Rda")
+### Genome-wide
+TCGA.06.0128 <- subset(TCGA.06.0128, numCTreads > 4)
+TCGA.06.0128.GR <- GRanges(seqnames = as.character(TCGA.06.0128$chrom),ranges = IRanges(start = as.numeric(as.character(TCGA.06.0128$start)), end=as.numeric(as.character(TCGA.06.0128$end))),percentMeth=as.numeric(as.character(TCGA.06.0128$percentMeth))) #23.807.332
+TCGA.16.1460 <- subset(TCGA.16.1460, numCTreads > 4)
+TCGA.16.1460.GR <- GRanges(seqnames = as.character(TCGA.16.1460$chrom),ranges = IRanges(start = as.numeric(as.character(TCGA.16.1460$start)), end=as.numeric(as.character(TCGA.16.1460$end))),percentMeth=as.numeric(as.character(TCGA.16.1460$percentMeth))) #24.262.574
+TCGA.19.1788 <- subset(TCGA.19.1788, numCTreads > 4)
+TCGA.19.1788.GR <- GRanges(seqnames = as.character(TCGA.19.1788$chrom),ranges = IRanges(start = as.numeric(as.character(TCGA.19.1788$start)), end=as.numeric(as.character(TCGA.19.1788$end))),percentMeth=as.numeric(as.character(TCGA.19.1788$percentMeth))) #24.708.686
+
+
+p.27k <- GRanges(seqnames = paste0("chr",as.character(idh.mut.27k$Chromosome)),ranges = IRanges(start = idh.mut.27k$Genomic_Coor, end=idh.mut.27k$Genomic_Coor),probeID=as.character(idh.mut.27k$Composite.El))
+
+aux <- as.data.frame(findOverlaps(TCGA.06.0128.GR,p.27k))
+
+TCGA.06.0128.27k <- idh.mut.27k[aux$subjectHits,"TCGA-06-0128"]
+TCGA.06.0128.27k <- TCGA.06.0128.27k*100
+TCGA.06.0128.27k.wgbs <- TCGA.06.0128[aux$queryHits,]
+aux <- data.frame(HM.27k=TCGA.06.0128.27k,WGBS=as.numeric(as.character(TCGA.06.0128.27k.wgbs$percentMeth)))
+heatpairs(as.matrix(aux))
+
+
+aux <- as.data.frame(findOverlaps(TCGA.16.1460.GR,p.27k))
+
+TCGA.16.1460.27k <- idh.mut.27k[aux$subjectHits,"TCGA-16-1460"]
+TCGA.16.1460.27k <- TCGA.16.1460.27k*100
+TCGA.16.1460.27k.wgbs <- TCGA.16.1460[aux$queryHits,]
+aux <- data.frame(HM.27k=TCGA.16.1460.27k,WGBS=as.numeric(as.character(TCGA.16.1460.27k.wgbs$percentMeth)))
+heatpairs(as.matrix(aux))
+
+
+aux <- as.data.frame(findOverlaps(TCGA.19.1788.GR,p.27k))
+
+TCGA.19.1788.27k <- idh.mut.27k[aux$subjectHits,"TCGA-19-1788"]
+TCGA.19.1788.27k <- TCGA.19.1788.27k*100
+TCGA.19.1788.27k.wgbs <- TCGA.19.1788[aux$queryHits,]
+aux <- data.frame(HM.27k=TCGA.19.1788.27k,WGBS=as.numeric(as.character(TCGA.19.1788.27k.wgbs$percentMeth)))
+heatpairs(as.matrix(aux))
+
+
+### 90 G-CIMP low/high specific
+load("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RandomForest.calls/GCIMPlow.90probes.Rda")
+aux1 <- idh.mut.27k[as.character(GCIMPlow.probes),]
+p.27k <- GRanges(seqnames = paste0("chr",as.character(aux1$Chromosome)),ranges = IRanges(start = aux1$Genomic_Coor, end=aux1$Genomic_Coor),probeID=as.character(aux1$Composite.El))
+
+aux <- as.data.frame(findOverlaps(TCGA.06.0128.GR,p.27k))
+
+TCGA.06.0128.27k <- aux1[aux$subjectHits,"TCGA-06-0128"]
+TCGA.06.0128.27k <- TCGA.06.0128.27k*100
+TCGA.06.0128.27k.wgbs <- TCGA.06.0128[aux$queryHits,]
+aux <- data.frame(HM.27k=TCGA.06.0128.27k,WGBS=as.numeric(as.character(TCGA.06.0128.27k.wgbs$percentMeth)))
+heatpairs(as.matrix(aux))
+
+
+aux <- as.data.frame(findOverlaps(TCGA.16.1460.GR,p.27k))
+
+TCGA.16.1460.27k <- aux1[aux$subjectHits,"TCGA-16-1460"]
+TCGA.16.1460.27k <- TCGA.16.1460.27k*100
+TCGA.16.1460.27k.wgbs <- TCGA.16.1460[aux$queryHits,]
+aux <- data.frame(HM.27k=TCGA.16.1460.27k,WGBS=as.numeric(as.character(TCGA.16.1460.27k.wgbs$percentMeth)))
+heatpairs(as.matrix(aux))
+
+
+aux <- as.data.frame(findOverlaps(TCGA.19.1788.GR,p.27k))
+
+TCGA.19.1788.27k <- aux1[aux$subjectHits,"TCGA-19-1788"]
+TCGA.19.1788.27k <- TCGA.19.1788.27k*100
+TCGA.19.1788.27k.wgbs <- TCGA.19.1788[aux$queryHits,]
+aux <- data.frame(HM.27k=TCGA.19.1788.27k,WGBS=as.numeric(as.character(TCGA.19.1788.27k.wgbs$percentMeth)))
+heatpairs(as.matrix(aux))
+
+
+#### 450k - G-CIMP low and high (feito no terminal)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+colnames(all.450k)[5:649] <- substr(colnames(all.450k)[5:649],1,12)
+low <- all.450k[,colnames(all.450k) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high <- all.450k[,colnames(all.450k) %in% aux]
+info <- all.450k[,1:4]
+save(low,high,info,file="low_high_450.rda")
+
+#chr2:177,015,322-177,056,035 HOXD4 HOXD3 HOXD-AS1 HOXD1
+
+######### Hyper gene
+
+load("/home/thais/GBM WGBS/low_high_450.rda")
+gr <- GRanges(seqnames = "chr2",ranges = IRanges(start = 177015322, end=177056035))
+low <- subset(low,Chromosome %in% c(1:22,"X","Y"))
+low$Chromosome <- paste0("chr",as.character(low$Chromosome))
+#p.450k <- makeGRangesFromDataFrame(low,
+#                        keep.extra.columns=TRUE,
+#                       ignore.strand=TRUE,
+#                      seqinfo=NULL,
+#                     seqnames.field="Chromosome",
+#                    start.field="Genomic_Coordinate",
+#                   end.field="Genomic_Coordinate",
+#                  starts.in.df.are.0based=FALSE)
+#genome(p.450k) <- "hg19"
+#genome(gr) <- "hg19"
+#low.450k <- DataTrack(subsetByOverlaps(p.450k,gr),name="G-CIMP low",type="a",col="darkgreen")
+
+high <- subset(high,Chromosome %in% c(1:22,"X","Y"))
+high$Chromosome <- paste0("chr",as.character(high$Chromosome))
+#p.450k <- makeGRangesFromDataFrame(high,
+#                         keep.extra.columns=TRUE,
+#                        ignore.strand=TRUE,
+#                         seqinfo=NULL,
+#                         seqnames.field="Chromosome",
+#                         start.field="Genomic_Coordinate",
+#                         end.field="Genomic_Coordinate",
+#                         starts.in.df.are.0based=FALSE)
+#genome(p.450k) <- "hg19"
+#high.450k <- DataTrack(subsetByOverlaps(p.450k,gr),name="G-CIMP high",type="a",col="firebrick")
+
+
+
+teste <- cbind(low,high[,5:244])
+p.450k <- makeGRangesFromDataFrame(teste,
+                                   keep.extra.columns=TRUE,
+                                   ignore.strand=TRUE,
+                                   seqinfo=NULL,
+                                   seqnames.field="Chromosome",
+                                   start.field="Genomic_Coordinate",
+                                   end.field="Genomic_Coordinate",
+                                   starts.in.df.are.0based=FALSE)
+genome(p.450k) <- "hg19"
+high.450k <- DataTrack(subsetByOverlaps(p.450k,gr),name="450k",type="smooth",groups=c(rep("GCIMP.low",12),rep("GCIMP.high",240)),col=c("firebrick","darkgreen"))
+
+library(Gviz)
+a <- AnnotationTrack(start=177015322, end=177056035,chromosome="chr2", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr2")
+
+knownGenes <- UcscTrack(genome = "hg19", chromosome = "chr2", track = "knownGene", from = 177015322, to = 177056035, trackType = "GeneRegionTrack",rstarts = "exonStarts", rends = "exonEnds", gene = "name",symbol = "name", transcript = "name", strand = "strand",fill = "#8282d2", name = "UCSC Genes")
+
+symbol(knownGenes) <- c("HOXD4","HOXD4","HOXD3","HOXD3","HOXD3","HOXD-AS1","HOXD-AS1","HOXD-AS1","HOXD-AS1","HOXD-AS1","HOXD-AS1","HOXD1","HOXD1","HOXD1","HOXD1","HOXD1")
+
+cpgIslands <- UcscTrack(genome = "hg19", chromosome = "chr2",track = "cpgIslandExt", from = 177015322, to = 177056035,trackType = "AnnotationTrack", start = "chromStart",end = "chromEnd", id = "name", shape = "box",fill = "#006400", name = "CpG Islands")
+
+h3k4me3 <- read.delim("H3K4me3.txt", as.is=TRUE)
+foo <- makeGRangesFromDataFrame(h3k4me3,
+                                keep.extra.columns=TRUE,
+                                ignore.strand=TRUE,
+                                seqnames.field="chrom",
+                                start.field="start",
+                                end.field="end",
+                                starts.in.df.are.0based=FALSE)
+genome(foo) <- "hg19"
+h3k4me3.dt <- DataTrack(foo,name="H3K4me3",type = "hist", window = "auto", col.histogram = "black")
+
+h3k27ac <- read.delim("h3k27ac.txt", as.is=TRUE)
+foo <- makeGRangesFromDataFrame(h3k27ac,
+                                keep.extra.columns=TRUE,
+                                ignore.strand=TRUE,
+                                seqnames.field="chrom",
+                                start.field="start",
+                                end.field="end",
+                                starts.in.df.are.0based=FALSE)
+genome(foo) <- "hg19"
+h3k27ac.dt <- DataTrack(foo,name="H3K27ac",type = "hist", window = "auto", col.histogram = "black")
+
+gr <- GRanges(seqnames = "chr2",ranges = IRanges(start = 177015322, end=177056035))
+#gr <- subsetByOverlaps(TCGA.06.0128.GR,gr)
+
+all <- merge(TCGA.06.0128[,c("chrom","start","end","percentMeth","numCTreads")],TCGA.16.1460[,c("chrom","start","percentMeth","numCTreads")],by=c("chrom","start"))
+all <- merge(all,TCGA.19.1788[,c("chrom","start","percentMeth","numCTreads")],by=c("chrom","start"))
+colnames(all) <- c("chrom","start","end","percentMeth.0128","numCTreads.0128","percentMeth.1460","numCTreads.1460","percentMeth.1788","numCTreads.1788")
+#Reduce(subsetByOverlaps, list(TCGA.06.0128.GR, TCGA.16.1460.GR, TCGA.19.1788.GR,gr))
+
+all.pr <- GRanges(seqnames = as.character(all$chrom),ranges = IRanges(start = as.numeric(as.character(all$start)), end=as.numeric(as.character(all$end))),percentMeth.0128=as.numeric(as.character(all$percentMeth.0128)),percentMeth.1460=as.numeric(as.character(all$percentMeth.1460)),percentMeth.1788=as.numeric(as.character(all$percentMeth.1788)))
+all.rd <- GRanges(seqnames = as.character(all$chrom),ranges = IRanges(start = as.numeric(as.character(all$start)), end=as.numeric(as.character(all$end))),reads.0128=as.numeric(as.character(all$numCTreads.0128)),reads.1460=as.numeric(as.character(all$numCTreads.1460)),reads.1788=as.numeric(as.character(all$numCTreads.1788)))
+
+#dat1 <- DataTrack(subsetByOverlaps(TCGA.06.0128.GR,gr),name="TCGA-06-0128")
+#dat2 <- DataTrack(subsetByOverlaps(TCGA.16.1460.GR,gr),name="TCGA-16-1460")
+#dat3 <- DataTrack(subsetByOverlaps(TCGA.19.1788.GR,gr),name="TCGA-19-1788")
+
+dat1 <- DataTrack(subsetByOverlaps(all.pr,gr),name="DNA Methylation %",col=c("darkgreen","firebrick","firebrick"),groups=c("0128 (GCIMP low)","1460 (GCIMP high)","1788 (GCIMP high)"),type="smooth")
+dat2 <- DataTrack(subsetByOverlaps(all.rd,gr),name="Number of Reads",col=c("darkgreen","firebrick","firebrick"),groups=c("0128 (GCIMP low)","1460 (GCIMP high)","1788 (GCIMP high)"),type="smooth")
+
+load("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RandomForest.calls/GCIMPlow.90probes.Rda")
+
+anno.450k <- AnnotationTrack(subsetByOverlaps(p.450k,gr), name = "450k probes", group= as.character(mcols(subsetByOverlaps(p.450k,gr))[,1]),cex.group=0.9,cex=1.5,feature=ifelse(as.character(mcols(subsetByOverlaps(p.450k,gr))[,1]) %in% GCIMPlow.probes, "sim","no"))
+overlap.mut <- e[elementLengths(e$value) > 4]
+plotTracks(list(itrack,gtrack,cpgIslands,knownGenes,dat2,dat1,high.450k,anno.450k),showId=TRUE,legend=TRUE,cex=1.5,groupAnnotation="group", sim="yellow", no="purple")
+
+
+## End hyper gene
+
+######### Hypo gene
+
+load("/home/thais/GBM WGBS/low_high_450.rda")
+gr <- GRanges(seqnames = "chr1",ranges = IRanges(start = 152956186, end=153030751))
+low <- subset(low,Chromosome %in% c(1:22,"X","Y"))
+low$Chromosome <- paste0("chr",as.character(low$Chromosome))
+#p.450k <- makeGRangesFromDataFrame(low,
+#                        keep.extra.columns=TRUE,
+#                       ignore.strand=TRUE,
+#                      seqinfo=NULL,
+#                     seqnames.field="Chromosome",
+#                    start.field="Genomic_Coordinate",
+#                   end.field="Genomic_Coordinate",
+#                  starts.in.df.are.0based=FALSE)
+#genome(p.450k) <- "hg19"
+#genome(gr) <- "hg19"
+#low.450k <- DataTrack(subsetByOverlaps(p.450k,gr),name="G-CIMP low",type="a",col="darkgreen")
+
+high <- subset(high,Chromosome %in% c(1:22,"X","Y"))
+high$Chromosome <- paste0("chr",as.character(high$Chromosome))
+#p.450k <- makeGRangesFromDataFrame(high,
+#                         keep.extra.columns=TRUE,
+#                        ignore.strand=TRUE,
+#                         seqinfo=NULL,
+#                         seqnames.field="Chromosome",
+#                         start.field="Genomic_Coordinate",
+#                         end.field="Genomic_Coordinate",
+#                         starts.in.df.are.0based=FALSE)
+#genome(p.450k) <- "hg19"
+#high.450k <- DataTrack(subsetByOverlaps(p.450k,gr),name="G-CIMP high",type="a",col="firebrick")
+
+
+
+teste <- cbind(low,high[,5:244])
+p.450k <- makeGRangesFromDataFrame(teste,
+                                   keep.extra.columns=TRUE,
+                                   ignore.strand=TRUE,
+                                   seqinfo=NULL,
+                                   seqnames.field="Chromosome",
+                                   start.field="Genomic_Coordinate",
+                                   end.field="Genomic_Coordinate",
+                                   starts.in.df.are.0based=FALSE)
+genome(p.450k) <- "hg19"
+high.450k <- DataTrack(subsetByOverlaps(p.450k,gr),name="450k",type="a",groups=c(rep("GCIMP.low",12),rep("GCIMP.high",240)),col=c("firebrick","darkgreen"))
+
+library(Gviz)
+a <- AnnotationTrack(start=152956186, end=153030751,chromosome="chr1", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr1")
+
+knownGenes <- UcscTrack(genome = "hg19", chromosome = "chr1", track = "knownGene", from = 152956186, to = 153030751, trackType = "GeneRegionTrack",rstarts = "exonStarts", rends = "exonEnds", gene = "name",symbol = "name", transcript = "name", strand = "strand",fill = "#8282d2", name = "UCSC Genes")
+
+symbol(knownGenes) <- c("SPRR1A","SPRR1A","SPRR1A","SPRR1A","SPRR1A","SPRR3","SPRR3","SPRR3","SPRR3","SPRR3","SPRR3","SPRR3","SPRR3","SPRR3","SPRR1B","SPRR1B","SPRR1B","SPRR2D","SPRR2D","SPRR2D","SPRR2A","SPRR2A","SPRR2A","SPRR2A","SPRR2A")
+
+cpgIslands <- UcscTrack(genome = "hg19", chromosome = "chr1",track = "cpgIslandExt", from = 152956186, to = 153030751,trackType = "AnnotationTrack", start = "chromStart",end = "chromEnd", id = "name", shape = "box",fill = "#006400", name = "CpG Islands")
+
+h3k4me3 <- read.delim("H3K4me3.txt", as.is=TRUE)
+foo <- makeGRangesFromDataFrame(h3k4me3,
+                                keep.extra.columns=TRUE,
+                                ignore.strand=TRUE,
+                                seqnames.field="chrom",
+                                start.field="start",
+                                end.field="end",
+                                starts.in.df.are.0based=FALSE)
+genome(foo) <- "hg19"
+h3k4me3.dt <- DataTrack(foo,name="H3K4me3",type = "hist", window = "auto", col.histogram = "black")
+
+h3k27ac <- read.delim("h3k27ac.txt", as.is=TRUE)
+foo <- makeGRangesFromDataFrame(h3k27ac,
+                                keep.extra.columns=TRUE,
+                                ignore.strand=TRUE,
+                                seqnames.field="chrom",
+                                start.field="start",
+                                end.field="end",
+                                starts.in.df.are.0based=FALSE)
+genome(foo) <- "hg19"
+h3k27ac.dt <- DataTrack(foo,name="H3K27ac",type = "hist", window = "auto", col.histogram = "black")
+
+gr <- GRanges(seqnames = "chr1",ranges = IRanges(start = 152956186, end=153030751))
+
+
+all.pr <- GRanges(seqnames = as.character(all$chrom),ranges = IRanges(start = as.numeric(as.character(all$start)), end=as.numeric(as.character(all$end))),percentMeth.0128=as.numeric(as.character(all$percentMeth.0128)),percentMeth.1460=as.numeric(as.character(all$percentMeth.1460)),percentMeth.1788=as.numeric(as.character(all$percentMeth.1788)))
+all.rd <- GRanges(seqnames = as.character(all$chrom),ranges = IRanges(start = as.numeric(as.character(all$start)), end=as.numeric(as.character(all$end))),reads.0128=as.numeric(as.character(all$numCTreads.0128)),reads.1460=as.numeric(as.character(all$numCTreads.1460)),reads.1788=as.numeric(as.character(all$numCTreads.1788)))
+
+#dat1 <- DataTrack(subsetByOverlaps(TCGA.06.0128.GR,gr),name="TCGA-06-0128")
+#dat2 <- DataTrack(subsetByOverlaps(TCGA.16.1460.GR,gr),name="TCGA-16-1460")
+#dat3 <- DataTrack(subsetByOverlaps(TCGA.19.1788.GR,gr),name="TCGA-19-1788")
+
+dat1 <- DataTrack(subsetByOverlaps(all.pr,gr),name="DNA Methylation %",col=c("darkgreen","firebrick","firebrick"),groups=c("0128 (GCIMP low)","1460 (GCIMP high)","1788 (GCIMP high)"),type="smooth")
+dat2 <- DataTrack(subsetByOverlaps(all.rd,gr),name="Number of Reads",col=c("darkgreen","firebrick","firebrick"),groups=c("0128 (GCIMP low)","1460 (GCIMP high)","1788 (GCIMP high)"),type="smooth")
+
+plotTracks(list(itrack,gtrack,cpgIslands,knownGenes,dat2,dat1,high.450k,h3k4me3.dt,h3k27ac.dt),showId=TRUE,legend=TRUE)
+
+### End hypo gene
+
+load("/home/thais/GBM WGBS/histonemarks.Rda")
+
+#### Tracks from Ucsc
+library(rtracklayer)
+ses  <- browserSession()
+genome(ses) <- "hg19"
+trackNames(ses)
+
+#### RNA seq
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- mrna[c("SPRR1A","SPRR1B","SPRR2A","SPRR2D","SPRR3"),colnames(mrna) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- mrna[c("SPRR1A","SPRR1B","SPRR2A","SPRR2D","SPRR3"),colnames(mrna) %in% aux]
+
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+
+low.m$subtype <- "G-CIMP.low"
+high.m$subtype <- "G-CIMP.high"
+all <- rbind(low.m,high.m)
+
+ggplot(all, aes(subtype, value)) + 
+  geom_boxplot(aes(fill = subtype)) + 
+  geom_jitter(height = 0, size=2)  + facet_wrap(~ symbol, scales = "free") +
+  scale_fill_manual(values = c("firebrick","darkgreen")) 
+
+all$mean_GCIMP.high <- apply(all[,c("percentMeth.1460","percentMeth.1788")],1,mean,na.rm=TRUE)
+
+
+load("/home/thais/GBM WGBS/histonemarks.Rda")
+
+#### Tracks from Ucsc
+library(rtracklayer)
+ses  <- browserSession()
+genome(ses) <- "hg19"
+trackNames(ses)
+
+#### RNA seq
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- mrna[c("HOXD3","HOXD4","HOXD1"),colnames(mrna) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- mrna[c("HOXD3","HOXD4","HOXD1"),colnames(mrna) %in% aux]
+save(low,high,info,file="low_high_450.rda")
+
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+
+low.m$subtype <- "G-CIMP.low"
+high.m$subtype <- "G-CIMP.high"
+all <- rbind(low.m,high.m)
+
+ggplot(all, aes(subtype, value)) + 
+  geom_boxplot(aes(fill = subtype)) + 
+  geom_jitter(height = 0, size=2)  + facet_wrap( ~ symbol) +
+  scale_fill_manual(values = c("firebrick","darkgreen")) 
+
+all$mean_GCIMP.high <- apply(all[,c("percentMeth.1460","percentMeth.1788")],1,mean,na.rm=TRUE)
+
+### Average DNA methylation within all windows of five adjacent CpG dinucleotides
+win.5CpG.0128 <- list()
+for(j in 1:nlevels(all$chrom)){
+  aux1 <- c()
+  aux <- subset(all,chrom %in% levels(all$chrom)[j])
+  aux <- aux[with(aux,order(start)),]
+  if(nrow(aux) > 5){
+    for(i in 1:(nrow(aux)-4)){
+      aux1 <- c(aux1,mean(aux[c(i:(i+4)),c("percentMeth.0128")],na.rm = T))
+    }
+  }
+  else{
+    aux1 <- c(aux1,mean(aux[,c("percentMeth.0128")],na.rm = T))
+  }
+  win.5CpG.0128 <- append(win.5CpG.0128,list(aux1))
+  print(j)
+}
+
+
+win.5CpG.1460 <- list()
+for(j in 1:nlevels(all$chrom)){
+  aux1 <- c()
+  aux <- subset(all,chrom %in% levels(all$chrom)[j])
+  aux <- aux[with(aux,order(start)),]
+  if(nrow(aux) > 5){
+    for(i in 1:(nrow(aux)-4)){
+      aux1 <- c(aux1,mean(aux[c(i:(i+4)),c("percentMeth.1460")],na.rm = T))
+    }
+  }
+  else{
+    aux1 <- c(aux1,mean(aux[,c("percentMeth.1460")],na.rm = T))
+  }
+  win.5CpG.1460 <- append(win.5CpG.1460,list(aux1))
+  print(j)
+}
+
+win.5CpG.1788 <- list()
+for(j in 1:nlevels(all$chrom)){
+  aux1 <- c()
+  aux <- subset(all,chrom %in% levels(all$chrom)[j])
+  aux <- aux[with(aux,order(start)),]
+  if(nrow(aux) > 5){
+    for(i in 1:(nrow(aux)-4)){
+      aux1 <- c(aux1,mean(aux[c(i:(i+4)),c("percentMeth.1788")],na.rm = T))
+    }
+  }
+  else{
+    aux1 <- c(aux1,mean(aux[,c("percentMeth.1788")],na.rm = T))
+  }
+  win.5CpG.1788 <- append(win.5CpG.1788,list(aux1))
+  print(j)
+}
+
+
+win.5CpG.high <- list()
+for(j in 1:nlevels(all$chrom)){
+  aux1 <- c()
+  aux <- subset(all,chrom %in% levels(all$chrom)[j])
+  aux <- aux[with(aux,order(start)),]
+  if(nrow(aux) > 5){
+    for(i in 1:(nrow(aux)-4)){
+      aux1 <- c(aux1,mean(aux[c(i:(i+4)),c("mean_GCIMP.high")],na.rm = T))
+    }
+  }
+  else{
+    aux1 <- c(aux1,mean(aux[,c("mean_GCIMP.high")],na.rm = T))
+  }
+  win.5CpG.high <- append(win.5CpG.high,list(aux1))
+  print(j)
+}
+
+
+all$DiffMean <- all$percentMeth.0128 - all$mean_GCIMP.high
+a <- subset(tudao, DiffMean < -90 & chrom %in% paste0("chr",c(1:22,"X","Y")))
+a$chrom <- factor(a$chrom)
+a$chrom <- factor(a$chrom, levels = paste0("chr",c(1:22,"X","Y")))
+a$start <- as.numeric(as.character(a$start))
+a$end <- as.numeric(as.character(a$end))
+ggplot(a, aes(x = factor(chrom))) + geom_bar()
+
+#Estimate score and absolute purity
+pd.gcimp <- subset(pd, clustM.supervised2 %in% c("G-CIMP-high","G-CIMP-low"))
+pd.gcimp$clustM.supervised2 <- factor(pd.gcimp$clustM.supervised2, levels = c("G-CIMP-low","G-CIMP-high"))
+ggplot(pd.gcimp, aes(y = (ESTIMATE.score), x = clustM.supervised2)) + 
+  geom_boxplot(aes(fill = factor(clustM.supervised2))) + 
+  geom_jitter(height = 0, position = position_jitter(width = .1), size=2) + 
+  scale_fill_manual(values = c("darkgreen","firebrick")) 
+
+ggplot(pd.gcimp, aes(y = (ABSOLUTE.Purity), x = clustM.supervised2)) + 
+  geom_boxplot(aes(fill = factor(clustM.supervised2))) + 
+  geom_jitter(height = 0, position = position_jitter(width = .1), size=2) + 
+  scale_fill_manual(values = c("darkgreen","firebrick")) 
+
+###IMR90 PMDs - http://www.ncbi.nlm.nih.gov/pmc/articles/PMC2857523/#SD1
+imr90.pmd <- read.delim("~/GBM WGBS/IMR90_PMD.txt")
+imr90.GR <- GRanges(seqnames = paste0("chr",as.character(imr90.pmd$Chromosome)),ranges = IRanges(start = as.numeric(as.character(imr90.pmd$Start)), end=as.numeric(as.character(imr90.pmd$End))))
+a <- subset(tudao, (DiffMean) > 90 & chrom %in% paste0("chr",c(1:22,"X","Y")))
+a$chrom <- as.character(a$chrom)
+a.GR <- makeGRangesFromDataFrame(a,
+                                 keep.extra.columns=TRUE,
+                                 ignore.strand=TRUE,
+                                 seqinfo=NULL,
+                                 seqnames.field="chrom",
+                                 start.field="start",
+                                 end.field="end",
+                                 starts.in.df.are.0based=FALSE)
+aux <- findOverlaps(a.GR,imr90.GR)
+aux <- as.data.frame(aux)
+a$imr90.pmd <- "No"
+a[aux$queryHits,"imr90.pmd"] <- "Yes"
+a$chrom <- factor(a$chrom, levels = paste0("chr",c(1:22,"X","Y")))
+ggplot(a, aes(x = factor(chrom))) + geom_bar(aes(fill=imr90.pmd))
+write.table(as.character(unique(aux$subjectHits)),file="gain.txt",quote=F,row.names=F,sep="\t")
+
+
+### LaminB1 - Old
+LaminB1 <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr1",header=T,sep="\t")
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr2",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr3",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr4",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr5",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr6",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr7",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr8",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr9",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr10",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr11",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr12",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr13",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr14",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr15",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr16",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr17",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr18",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr19",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr20",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr21",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chr22",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chrX",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+aux <- read.table("~/GBM WGBS/LaminB1/LaminB1_chrY",header=F,sep="\t")
+colnames(aux) <- colnames(LaminB1)
+LaminB1 <- rbind(LaminB1,aux)
+
+###LaminB1 - new
+LaminB1 <- read.table("~/GBM WGBS/LaminB1/laminB1.txt",header=F,sep="\t")
+colnames(LaminB1) <- c("bin","chrom","chromStart","chromEnd","name","span","count","offset","file","lowerLimit","dataRange","validCount","sumData","sumSquares")
+#about each column: http://ucscbrowser.genap.ca/cgi-bin/hgTables?db=hg19&hgta_group=regulation&hgta_track=laminB1&hgta_table=laminB1&hgta_doSchema=describe+table+schema
+
+
+#### PDGFRA and FIP1L1
+load("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM//RNAseq_05-11-14/rnaSeqNorm.Rda")
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[c("FIP1L1"),colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[c("FIP1L1"),colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Classic-like"))$case.id)
+classic.mrna <- rna.seq.lgg.gbm[c("FIP1L1"),colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Mesenchymal-like"))$case.id)
+mes.mrna <- rna.seq.lgg.gbm[c("FIP1L1"),colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-LGG"))$case.id)
+palgg.mrna <- rna.seq.lgg.gbm[c("FIP1L1"),colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-GBM"))$case.id)
+pagbm.mrna <- rna.seq.lgg.gbm[c("FIP1L1"),colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("IDHmut-codel"))$case.id)
+codel.mrna <- rna.seq.lgg.gbm[c("FIP1L1"),colnames(rna.seq.lgg.gbm) %in% aux]
+
+
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+
+classic.mrna$symbol <- rownames(classic.mrna)
+classic.m <- melt(classic.mrna,id="symbol")
+
+mes.mrna$symbol <- rownames(mes.mrna)
+mes.m <- melt(mes.mrna,id="symbol")
+
+palgg.mrna$symbol <- rownames(palgg.mrna)
+palgg.m <- melt(palgg.mrna,id="symbol")
+
+pagbm.mrna$symbol <- rownames(pagbm.mrna)
+pagbm.m <- melt(pagbm.mrna,id="symbol")
+
+codel.mrna$symbol <- rownames(codel.mrna)
+codel.m <- melt(codel.mrna,id="symbol")
+
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+
+low.m$subtype <- "G-CIMP.low"
+high.m$subtype <- "G-CIMP.high"
+codel.m$subtype <- "IDHmut.codel"
+classic.m$subtype <- "Classic.like"
+mes.m$subtype <- "Mesenchymal.like"
+pagbm.m$subtype <- "LGm6.GBM"
+palgg.m$subtype <- "PA-like"
+all <- rbind(low.m,high.m)
+all <- rbind(all,codel.m)
+all <- rbind(all,classic.m)
+all <- rbind(all,mes.m)
+all <- rbind(all,pagbm.m)
+all <- rbind(all,palgg.m)
+
+all$value <- log10(all$value)
+
+all$subtype <- factor(all$subtype, levels = c("G-CIMP.low","G-CIMP.high","IDHmut.codel","Classic.like","Mesenchymal.like","LGm6.GBM","PA-like"))
+all <- merge(all,pd[c("case.id","subtype")],by.x="variable",by.y="case.id",all.x=T)
+levels(all$subtype.y) <- c("No.Proneural","No.Proneural","No.Proneural","No.Proneural","Proneural","No.Proneural","No.Proneural","No.Proneural")
+
+ggplot(all, aes(factor(subtype.x), value,fill = factor(subtype.x))) + 
+  geom_boxplot()  + 
+  geom_jitter() +
+  facet_wrap( ~ subtype.y) +
+  scale_fill_manual(values = c("darkgreen","firebrick","purple","orange3","yellow","darkblue","cyan")) 
+
+
+### CTCF binding sites - http://www.ncbi.nlm.nih.gov/pubmed/26700815
+#Huy Dinh sent by email on Feb, 2nd
+gbm.wt1 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/gbm1w.bed")
+gbm.wt1.GR <- makeGRangesFromDataFrame(gbm.wt1,
+                                 keep.extra.columns=TRUE,
+                                 ignore.strand=FALSE,
+                                 seqinfo=NULL,
+                                 seqnames.field="V1",
+                                 start.field="V2",
+                                 end.field="V3",
+                                 strand.field = "V6",
+                                 starts.in.df.are.0based=FALSE)
+gbm.wt2 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/gbm2w.bed")
+gbm.wt2.GR <- makeGRangesFromDataFrame(gbm.wt2,
+                                       keep.extra.columns=TRUE,
+                                       ignore.strand=FALSE,
+                                       seqinfo=NULL,
+                                       seqnames.field="V1",
+                                       start.field="V2",
+                                       end.field="V3",
+                                       strand.field = "V6",
+                                       starts.in.df.are.0based=FALSE)
+gbm.wt3 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/gbm3w.bed")
+gbm.wt3.GR <- makeGRangesFromDataFrame(gbm.wt3,
+                                       keep.extra.columns=TRUE,
+                                       ignore.strand=FALSE,
+                                       seqinfo=NULL,
+                                       seqnames.field="V1",
+                                       start.field="V2",
+                                       end.field="V3",
+                                       strand.field = "V6",
+                                       starts.in.df.are.0based=FALSE)
+gbm.wt5 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/gbm5w.bed")
+gbm.wt5.GR <- makeGRangesFromDataFrame(gbm.wt5,
+                                       keep.extra.columns=TRUE,
+                                       ignore.strand=FALSE,
+                                       seqinfo=NULL,
+                                       seqnames.field="V1",
+                                       start.field="V2",
+                                       end.field="V3",
+                                       strand.field = "V6",
+                                       starts.in.df.are.0based=FALSE)
+gbm.wt6 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/gbm6w.bed")
+gbm.wt6.GR <- makeGRangesFromDataFrame(gbm.wt6,
+                                       keep.extra.columns=TRUE,
+                                       ignore.strand=FALSE,
+                                       seqinfo=NULL,
+                                       seqnames.field="V1",
+                                       start.field="V2",
+                                       end.field="V3",
+                                       strand.field = "V6",
+                                       starts.in.df.are.0based=FALSE)
+gbm.wt7 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/gbm7w.bed")
+gbm.wt7.GR <- makeGRangesFromDataFrame(gbm.wt7,
+                                       keep.extra.columns=TRUE,
+                                       ignore.strand=FALSE,
+                                       seqinfo=NULL,
+                                       seqnames.field="V1",
+                                       start.field="V2",
+                                       end.field="V3",
+                                       strand.field = "V6",
+                                       starts.in.df.are.0based=FALSE)
+gbm.mut15 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/aa15m.bed")
+gbm.mut15.GR <- makeGRangesFromDataFrame(gbm.mut15,
+                                       keep.extra.columns=TRUE,
+                                       ignore.strand=FALSE,
+                                       seqinfo=NULL,
+                                       seqnames.field="V1",
+                                       start.field="V2",
+                                       end.field="V3",
+                                       strand.field = "V6",
+                                       starts.in.df.are.0based=FALSE)
+gbm.mut16 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/aa16m.bed")
+gbm.mut16.GR <- makeGRangesFromDataFrame(gbm.mut16,
+                                         keep.extra.columns=TRUE,
+                                         ignore.strand=FALSE,
+                                         seqinfo=NULL,
+                                         seqnames.field="V1",
+                                         start.field="V2",
+                                         end.field="V3",
+                                         strand.field = "V6",
+                                         starts.in.df.are.0based=FALSE)
+gbm.mut17 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/aa17m.bed")
+gbm.mut17.GR <- makeGRangesFromDataFrame(gbm.mut17,
+                                         keep.extra.columns=TRUE,
+                                         ignore.strand=FALSE,
+                                         seqinfo=NULL,
+                                         seqnames.field="V1",
+                                         start.field="V2",
+                                         end.field="V3",
+                                         strand.field = "V6",
+                                         starts.in.df.are.0based=FALSE)
+gbm.mut18 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/od18m.bed")
+gbm.mut18.GR <- makeGRangesFromDataFrame(gbm.mut18,
+                                         keep.extra.columns=TRUE,
+                                         ignore.strand=FALSE,
+                                         seqinfo=NULL,
+                                         seqnames.field="V1",
+                                         start.field="V2",
+                                         end.field="V3",
+                                         strand.field = "V6",
+                                         starts.in.df.are.0based=FALSE)
+gbm.mut19 <- read.table("/home/thais/CTCF_IDHmutGliomas/Huy_PeakCalling/aa19m.bed")
+gbm.mut19.GR <- makeGRangesFromDataFrame(gbm.mut19,
+                                         keep.extra.columns=TRUE,
+                                         ignore.strand=FALSE,
+                                         seqinfo=NULL,
+                                         seqnames.field="V1",
+                                         start.field="V2",
+                                         end.field="V3",
+                                         strand.field = "V6",
+                                         starts.in.df.are.0based=FALSE)
+
+gbm.wt1$sample <- "gbm.wt1"
+gbm.wt2$sample <- "gbm.wt2"
+gbm.wt3$sample <- "gbm.wt3"
+gbm.wt5$sample <- "gbm.wt5"
+gbm.wt6$sample <- "gbm.wt6"
+gbm.wt7$sample <- "gbm.wt7"
+a <- rbind(gbm.wt1,gbm.wt2)
+a <- rbind(a,gbm.wt3)
+a <- rbind(a,gbm.wt5)
+a <- rbind(a,gbm.wt6)
+a <- rbind(a,gbm.wt7)
+a <- a[,-c(4,5,6)]
+colnames(a) <- c("chr","start","end","sample")
+gr <- makeGRangesFromDataFrame(a,TRUE)
+d <- disjoin(gr)
+olaps <- findOverlaps(d, gr)
+mcols(d) <- splitAsList(gr$sample[subjectHits(olaps)], queryHits(olaps))
+overlap.wt <- d[elementLengths(d$value) > 5]
+
+gbm.mut15$sample <- "gbm.mut15"
+gbm.mut16$sample <- "gbm.mut16"
+gbm.mut17$sample <- "gbm.mut17"
+gbm.mut18$sample <- "gbm.mut18"
+gbm.mut19$sample <- "gbm.mut19"
+a <- rbind(gbm.mut15,gbm.mut16)
+a <- rbind(a,gbm.mut17)
+a <- rbind(a,gbm.mut18)
+a <- rbind(a,gbm.mut19)
+a <- a[,-c(4,5,6)]
+colnames(a) <- c("chr","start","end","sample")
+gr <- makeGRangesFromDataFrame(a,TRUE)
+e <- disjoin(gr)
+olaps <- findOverlaps(e, gr)
+mcols(e) <- splitAsList(gr$sample[subjectHits(olaps)], queryHits(olaps))
+overlap.mut <- e[elementLengths(e$value) > 4]
+
+not.in.mut <- findOverlaps(overlap.mut,overlap.wt)
+overlap.mut <- as.data.frame(overlap.mut)
+CTCF.loss.inMut <- overlap.mut[-queryHits(not.in.mut),]
+
+a <- subset(all, DiffMean < -90 & chrom %in% paste0("chr",c(1:22,"X","Y")))
+a$chrom <- factor(a$chrom)
+a$chrom <- factor(a$chrom, levels = paste0("chr",c(1:22,"X","Y")))
+a$start <- as.numeric(as.character(a$start))
+a$end <- as.numeric(as.character(a$end))
+diff.90 <- makeGRangesFromDataFrame(a,
+                                    keep.extra.columns=TRUE,
+                                    ignore.strand=FALSE,
+                                    seqinfo=NULL,
+                                    seqnames.field="chrom",
+                                    start.field="start",
+                                    end.field="end",
+                                    starts.in.df.are.0based=FALSE)
+#CTCF.GR <- makeGRangesFromDataFrame(CTCF.loss.inMut[,1:3],
+CTCF.GR <- makeGRangesFromDataFrame(overlap.mut[,1:3],
+                                    keep.extra.columns=TRUE,
+                                    ignore.strand=FALSE,
+                                    seqinfo=NULL,
+                                    seqnames.field="seqnames",
+                                    start.field="start",
+                                    end.field="end",
+                                    starts.in.df.are.0based=FALSE)
+olaps <- findOverlaps(diff.90, CTCF.GR)
+
+#### DNA methylation level at CTCF binding sites between G-CIMP low x G-CIMP high
+all.pr <- GRanges(seqnames = as.character(all$chrom),ranges = IRanges(start = as.numeric(as.character(all$start)), end=as.numeric(as.character(all$end))),percentMeth.0128=as.numeric(as.character(all$percentMeth.0128)),mean_GCIMP.high=as.numeric(as.character(all$mean_GCIMP.high)))
+#overlaps <- Reduce(subsetByOverlaps, list(all.pr, gbm.mut19.GR, gbm.mut18.GR,gbm.mut17.GR,gbm.mut16.GR,gbm.mut15.GR,gbm.wt7.GR,gbm.wt6.GR,gbm.wt5.GR,gbm.wt3.GR,gbm.wt3.GR,gbm.wt2.GR,gbm.wt1.GR))
+lost <- read.table("/home/thais/CTCF_IDHmutGliomas/FromHuy/lost_in_idh1m_pt_2fc_qn_11.bed")
+colnames(lost) <- c("chrom","start","end","id","number","strand")
+overlaps <- subsetByOverlaps(all.pr, makeGRangesFromDataFrame(lost))
+overlaps <- as.data.frame(overlaps)
+overlap <- melt(overlaps[,6:7])
+ggplot(overlap, aes(variable, value)) + 
+  geom_boxplot(aes(fill = variable)) + 
+  #geom_jitter(height = 0, size=2)  + #facet_wrap(~ symbol, scales = "free") +
+  scale_fill_manual(values = c("darkgreen","firebrick")) 
+
+overlaps <- findOverlaps(all.pr, makeGRangesFromDataFrame(lost))
+new <- cbind(tudao[queryHits(overlaps),],lost[subjectHits(overlaps),"id"])
+new <- merge(new,normalBrain[,c(1,2,9)],by=c("chrom","start"),all.x=TRUE)
+colnames(new)[12] <- "CTCF_id"
+ctcf.gain <- subset(new, DiffMean > 50)
+ctcf.loss <- subset(new, DiffMean < -50)
+ctcf.gain$chrom <- factor(ctcf.gain$chrom)
+ctcf.loss$chrom <- factor(ctcf.loss$chrom)
+overlap <- melt(ctcf.gain[,c(4,10,13)])
+ggplot(overlap, aes(variable, value)) + 
+  geom_boxplot(aes(fill = variable)) + 
+  geom_jitter(height = 0, size=2)  + #facet_wrap(~ symbol, scales = "free") +
+  scale_fill_manual(values = c("darkgreen","firebrick","gray")) 
+
+overlap <- melt(new[,c(4,10,13)])
+ggplot(overlap, aes(variable, value)) + 
+  geom_boxplot(aes(fill = variable)) + 
+  #geom_jitter(height = 0, size=2)  + #facet_wrap(~ symbol, scales = "free") +
+  scale_fill_manual(values = c("darkgreen","firebrick","gray")) 
+
+
+##CTCF boundaries
+genes_hg19 <- read.table("/home/thais/Dropbox/Galaxy1-[Homo_sapiens_genes_(GRCh37.p13)].tabular",header=TRUE,sep="\t")
+genes_hg19 <- genes_hg19[genes_hg19$Chromosome.Name %in% c(1:22,"X","Y"),]
+genes_hg19 <- genes_hg19[!is.na(genes_hg19$EntrezGene.ID),]
+genes_hg19 <- genes_hg19[!duplicated(genes_hg19$EntrezGene.ID),] #the duplicates are different transcripts, not different coordinates
+gene.GR <- GRanges(seqnames = paste0("chr",genes_hg19$Chromosome.Name),ranges = IRanges(start = genes_hg19$Gene.Start..bp., end=genes_hg19$Gene.End..bp.), strand = genes_hg19$Strand, symbol = genes_hg19$Associated.Gene.Name, EntrezID = genes_hg19$EntrezGene.ID)
+loss <- subset(lost,id %in% as.character(ctcf.gain$CTCF_id))
+EntrezID <- as.data.frame(subsetByOverlaps(gene.GR,makeGRangesFromDataFrame(loss)))$EntrezID
+
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[rna.seq.lgg.gbm$entrezID %in% EntrezID,colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[rna.seq.lgg.gbm$entrezID %in% EntrezID,colnames(rna.seq.lgg.gbm) %in% aux]
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+
+low.m$subtype <- "G-CIMP.low"
+high.m$subtype <- "G-CIMP.high"
+all <- rbind(low.m,high.m)
+all$value <- all$value + 1
+all$value <- log10(all$value)
+all <- na.omit(all)
+all$subtype <- as.factor(all$subtype)
+all$subtype <- factor(all$subtype, levels = c("G-CIMP.low","G-CIMP.high"))
+
+ggplot(all, aes(factor(subtype), value,fill = subtype)) + 
+  geom_boxplot()  + 
+  geom_jitter() +
+  facet_wrap( ~ symbol,scales="free") +
+  scale_fill_manual(values = c("darkgreen","firebrick")) 
+
+#CTCF - Gain - genes between 2 CTCF binding sites (< 1M bp)
+aux <- lost[lost$id %in% c(ctcf.gain$CTCF_id),]
+x <- aux[with(aux,order(chrom,start)),]
+x$start <- x$start/1000000
+x$end <- x$end/1000000
+rownames(x) <- NULL
+x[c(14,15,30,31,34,35,52,53,54,59,60),] #gain
+gain.GR <- GRanges(seqnames = c("chr11","chr18","chr2","chr5","chr5","chr7"),ranges = IRanges(start = c(9634738,5890589,26726283,139525406,140186418,4764529), end=c(9635946,6414681,26785487,140186716,140480158,4885834)))
+
+EntrezID <- as.data.frame(subsetByOverlaps(gene.GR,gain.GR))$EntrezID #49 genes and 46 matched
+gain.Symbol <- as.data.frame(subsetByOverlaps(gene.GR,gain.GR))$symbol
+
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[rna.seq.lgg.gbm$entrezID %in% EntrezID,colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[rna.seq.lgg.gbm$entrezID %in% EntrezID,colnames(rna.seq.lgg.gbm) %in% aux]
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+
+low.m$subtype <- "G-CIMP.low"
+high.m$subtype <- "G-CIMP.high"
+all <- rbind(low.m,high.m)
+all$value <- all$value + 1
+all$value <- log10(all$value)
+all <- na.omit(all)
+all$subtype <- as.factor(all$subtype)
+all$subtype <- factor(all$subtype, levels = c("G-CIMP.low","G-CIMP.high"))
+
+ggplot(all, aes(factor(subtype), value,fill = subtype)) + 
+  geom_boxplot()  + 
+  geom_jitter() +
+  facet_wrap( ~ symbol,scales="free") +
+  scale_fill_manual(values = c("darkgreen","firebrick")) 
+
+
+#CTCF - Loss - genes between 2 CTCF binding sites (< 1M bp)
+aux <- lost[lost$id %in% c(ctcf.loss$CTCF_id),]
+x <- aux[with(aux,order(chrom,start)),]
+x$start <- x$start/1000000
+x$end <- x$end/1000000
+rownames(x) <- NULL
+x[c(37,38,54,55,56,59,60,77,78,79,90,91),] #loss
+loss.GR <- GRanges(seqnames = c("chr19","chr2","chr2","chr20","chr4","chr4","chr7"),ranges = IRanges(start = c(2064965,233893604,234766545,60449777,7309101,7700358,1262870), end=c(2551016,234766854,235167119,60951906,7700603,8505905,1546890)))
+
+EntrezID <- as.data.frame(subsetByOverlaps(gene.GR,loss.GR))$EntrezID #71 genes and 60 matched
+loss.Symbol <- as.data.frame(subsetByOverlaps(gene.GR,loss.GR))$symbol
+
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[rna.seq.lgg.gbm$entrezID %in% EntrezID,colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[rna.seq.lgg.gbm$entrezID %in% EntrezID,colnames(rna.seq.lgg.gbm) %in% aux]
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+
+low.m$subtype <- "G-CIMP.low"
+high.m$subtype <- "G-CIMP.high"
+all <- rbind(low.m,high.m)
+all$value <- all$value + 1
+all$value <- log10(all$value)
+all <- na.omit(all)
+all$subtype <- as.factor(all$subtype)
+all$subtype <- factor(all$subtype, levels = c("G-CIMP.low","G-CIMP.high"))
+
+ggplot(all, aes(factor(subtype), value,fill = subtype)) + 
+  geom_boxplot()  + 
+  geom_jitter() +
+  facet_wrap( ~ symbol,scales="free") +
+  scale_fill_manual(values = c("darkgreen","firebrick")) 
+
+#chromHMM - http://genome.cshlp.org/content/24/5/761.full Nagarajan et al., 2014
+setwd("/home/thais/chromHMM/samples/")
+a <- subset(tudao, DiffMean > 90 & chrom %in% paste0("chr",c(1:22,"X","Y")))
+a$status <- "gain"
+b <- subset(tudao, DiffMean < -90 & chrom %in% paste0("chr",c(1:22,"X","Y")))
+b$status <- "loss"
+a <- rbind(a,b)
+a$chrom <- factor(a$chrom)
+chromHMM <- NULL
+a.GR <- makeGRangesFromDataFrame(a[,c("chrom","start","end","status")], keep.extra.columns=TRUE)
+for(i in 1:length(list.files())){ 
+    aux <- read.table(list.files()[i],header=TRUE)
+    aux$id <- list.files()[i]
+    aux.GR <- makeGRangesFromDataFrame(aux,
+                         keep.extra.columns=TRUE,
+                         ignore.strand=TRUE,
+                         seqinfo=NULL,
+                         seqnames.field="Chromosome",
+                         start.field="start",
+                         end.field="end",
+                         starts.in.df.are.0based=FALSE)
+    b <- findOverlaps(a.GR,aux.GR)
+    if(is.null(chromHMM))
+      chromHMM <- cbind(a[queryHits(b),c("chrom","start","end","status")],aux[subjectHits(b),c("type","id")])
+    else
+      chromHMM <- rbind(chromHMM,cbind(a[queryHits(b),c("chrom","start","end","status")],aux[subjectHits(b),c("type","id")]))
+}
+ggplot(chromHMM, aes(x = id)) + geom_bar(aes(fill=type)) + facet_wrap(~ status, scales="free") + scale_fill_manual(values=c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1"),guide = guide_legend(title = "Legend"))
+
+#Heatmap chromHMM
+a <- subset(tudao, DiffMean > 90 & chrom %in% paste0("chr",c(1:22,"X","Y")))
+a$chrom <- factor(a$chrom)
+chromHMM <- NULL
+a.GR <- makeGRangesFromDataFrame(a[,c("chrom","start","end")], keep.extra.columns=TRUE)
+for(i in 1:length(list.files())){ 
+  aux <- read.table(list.files()[i],header=TRUE)
+  aux$id <- list.files()[i]
+  aux.GR <- makeGRangesFromDataFrame(aux,
+                                     keep.extra.columns=TRUE,
+                                     ignore.strand=TRUE,
+                                     seqinfo=NULL,
+                                     seqnames.field="Chromosome",
+                                     start.field="start",
+                                     end.field="end",
+                                     starts.in.df.are.0based=FALSE)
+  b <- findOverlaps(a.GR,aux.GR,type="within")
+  chromHMM <- cbind(chromHMM,aux[subjectHits(b),"type"])
+  colnames(chromHMM)[i] <-list.files()[i]
+}
+chromHMM <- as.data.frame(chromHMM)
+chromHMM$SF7996_5_segments.bed <- as.factor(chromHMM$SF7996_5_segments.bed)
+chromHMM$SF6379_5_segments.bed <- as.factor(chromHMM$SF6379_5_segments.bed)
+chromHMM$SF4960_5_segments.bed <- as.factor(chromHMM$SF4960_5_segments.bed)
+chromHMM$SF4948_5_segments.bed <- as.factor(chromHMM$SF4948_5_segments.bed)
+chromHMM$Mid_Frontal_Lobe_5_segments.bed <- as.factor(chromHMM$Mid_Frontal_Lobe_5_segments.bed)
+chromHMM$Inferior_Temporal_Lobe_5_segments.bed <- as.factor(chromHMM$Inferior_Temporal_Lobe_5_segments.bed)
+chromHMM$Hippocampus_Middle_5_segments.bed <- as.factor(chromHMM$Hippocampus_Middle_5_segments.bed)
+chromHMM$Cingulate_Gyrus_5_segments.bed <- as.factor(chromHMM$Cingulate_Gyrus_5_segments.bed)
+chromHMM$Anterior_Caudate_5_segments.bed <- as.factor(chromHMM$Anterior_Caudate_5_segments.bed)
+hc.m.gain <- as.hclust(agnes(daisy(data.frame(chromHMM), metric="gower"), method="ward"))
+chromHMM.order <- chromHMM[hc.m.gain$order,]
+rownames(chromHMM.order) <- NULL
+chromHMM.order$teste <- rownames(chromHMM.order)
+chromHMM.order <- (melt(chromHMM.order,id="teste"))
+chromHMM.order$teste <- as.factor(chromHMM.order$teste)
+chromHMM.order$teste <- factor(chromHMM.order$teste, levels=rownames(chromHMM[hc.m.gain$order,]))
+
+ggplot(chromHMM.order, aes(y=teste,x=variable)) + 
+  geom_tile(aes(fill=factor(value))) +
+  scale_fill_manual(values=c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1"),guide = guide_legend(title = "Legend")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),axis.text.y = element_blank())
+ggsave("/home/thais/chromHMM/heatmap_Gain.png",dpi=300,width = 15, height = 15)
+
+#Heatmap CTCF binding sites differentially methylated
+overlaps <- findOverlaps(all.pr, makeGRangesFromDataFrame(lost))
+new <- cbind(tudao[queryHits(overlaps),],lost[subjectHits(overlaps),"id"])
+new <- merge(new,normalBrain[,c(1,2,9)],by=c("chrom","start"),all.x=TRUE)
+a <- subset(new, abs(DiffMean) > 50)
+heatmap.plus(as.matrix(a[,c(13,14,4,6,8)]),
+             Colv=NA,
+             col=jet.colors(75),
+             cexCol = 0.5,
+             labRow = NA,
+             labCol = NA,
+             scale = "none")
+
+z <- seq(min(a[,c(13,14,4,6,8)],na.rm=TRUE), max(a[,c(13,14,4,6,8)],na.rm=TRUE), length = 200) #min(lgg.gbm.27.450.order) and #max(lgg.gbm.27.450.order)
+n <- max(a[,c(13,14,4,6,8)],na.rm=TRUE)
+pdf("key.pdf",width=10, height=05,bg = "transparent")
+image(matrix(z, ncol = 1), col = jet.colors(75),
+      xaxt = "n", yaxt = "n", main = "Overlap count Key")
+box()
+par(usr = c(0, n, 0, n))
+axis(1, at = c(0,max(z)), c(min(z),max(z)))
+dev.off()
+
+
+#### IDHwt
+TCGA.14.1454 <- read.table("ResultCount_MERGING_1_NIC1254A47.hg19_rCRSchrm.fa.realign.mdups.recal.cpg.filtered.sort.CG.6plus2.fixed.bed")
+TCGA.14.3477 <- read.table("ResultCount_MERGING_1_NIC1254A48.hg19_rCRSchrm.fa.realign.mdups.recal.cpg.filtered.sort.CG.6plus2.fixed.bed")
+TCGA.14.1401 <- read.table("ResultCount_MERGING_1_NIC1254A52.hg19_rCRSchrm.fa.realign.mdups.recal.cpg.filtered.sort.CG.6plus2.fixed.bed")
+colnames(TCGA.14.1401) <- c("chrom","start","end","name","score","strand","percentMeth","numCTreads")
+colnames(TCGA.14.1454) <- c("chrom","start","end","name","score","strand","percentMeth","numCTreads")
+colnames(TCGA.14.3477) <- c("chrom","start","end","name","score","strand","percentMeth","numCTreads")
+TCGA.14.3477$percentMeth <- as.numeric(as.character(TCGA.14.3477$percentMeth))
+TCGA.14.1454$percentMeth <- as.numeric(as.character(TCGA.14.1454$percentMeth))
+TCGA.14.1401$percentMeth <- as.numeric(as.character(TCGA.14.1401$percentMeth))
+
+save(TCGA.14.3477,TCGA.14.1401,TCGA.14.1454,file="/home/thais/GBM WGBS/IDHwt_3samples.rda")
+load("/home/thais/CTCF_IDHmutGliomas/CTCF_4271p.rda") #only IDHmut and normal brain
+
+a <- merge(new, TCGA.14.3477[,c(1,2,7)],by=c("chrom","start"),all.x=TRUE)
+colnames(a)[15] <- "percentMeth.3477"
+a <- merge(a, TCGA.14.1401[,c(1,2,7)],by=c("chrom","start"),all.x=TRUE)
+colnames(a)[16] <- "percentMeth.1401"
+a <- merge(a, TCGA.14.1454[,c(1,2,7)],by=c("chrom","start"),all.x=TRUE)
+colnames(a)[17] <- "percentMeth.1454"
+overlap <- melt(a[,c(4,6,8,15,16,17,13,14)])
+a <- ctcf.all
+save(ctcf.all,file="/home/thais/CTCF_IDHmutGliomas/ctcf_all.rda") #includes the IDHwt too
+
+ggplot(overlap, aes(variable, value)) + 
+  geom_boxplot(aes(fill = variable)) + 
+  scale_fill_manual(values = c("darkgreen","firebrick","firebrick","black","black","black","gray","gray")) 
+
+setwd("/home/thais/chromHMM/samples/")
+a <- subset(ctcf.all, DiffMean > 50)
+a$status <- "gain"
+b <- subset(ctcf.all, DiffMean < -50)
+b$status <- "loss"
+a <- rbind(a,b)
+a$chrom <- factor(a$chrom)
+chromHMM <- NULL
+a.GR <- makeGRangesFromDataFrame(a[,c("chrom","start","end","status")], keep.extra.columns=TRUE)
+for(i in 1:length(list.files())){ 
+  aux <- read.table(list.files()[i],header=TRUE)
+  aux$id <- list.files()[i]
+  aux.GR <- makeGRangesFromDataFrame(aux,
+                                     keep.extra.columns=TRUE,
+                                     ignore.strand=TRUE,
+                                     seqinfo=NULL,
+                                     seqnames.field="Chromosome",
+                                     start.field="start",
+                                     end.field="end",
+                                     starts.in.df.are.0based=FALSE)
+  b <- findOverlaps(a.GR,aux.GR,type="within")
+  chromHMM <- cbind(chromHMM,as.character(aux[subjectHits(b),"type"]))
+  colnames(chromHMM)[i] <-list.files()[i]
+}
+chromHMM <- as.data.frame(chromHMM,stringsAsFactors=TRUE)
+#aux <- as.matrix(sapply(chromHMM, as.character)) 
+levels(chromHMM$SF7996_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+levels(chromHMM$SF6379_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+levels(chromHMM$SF4960_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+levels(chromHMM$SF4948_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+levels(chromHMM$Mid_Frontal_Lobe_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+levels(chromHMM$Inferior_Temporal_Lobe_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+levels(chromHMM$Hippocampus_Middle_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+levels(chromHMM$Cingulate_Gyrus_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+levels(chromHMM$Anterior_Caudate_5_segments.bed) <- c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1")
+chromHMM$status <- c(rep("red",length(gain)),rep("blue",length(loss)))
+rownames(chromHMM) <- rownames(a)
+
+rownames(ctcf.all) <- paste(as.character(ctcf.all$chrom),as.character(ctcf.all$start),sep=".")
+b <- subset(ctcf.all, DiffMean > 50)
+b <- b[,c(4,6,8,15,16,17,13,14)]
+aux <- hclust(dist(b))
+gain <- rownames(b[aux$order,])
+b <- subset(ctcf.all, DiffMean < -50)
+b <- b[,c(4,6,8,15,16,17,13,14)]
+aux <- hclust(dist(b))
+loss <- rownames(b[aux$order,])
+b <- ctcf.all[c(gain,loss),c(4,6,8,15,16,17,13,14)]
+chromHMM.order <- chromHMM[rownames(b),]
+clab <- cbind(c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"),c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"))
+rlab <- as.matrix(sapply(chromHMM.order, as.character)) 
+#pdf("/home/thais/CTCF_IDHmutGliomas/heatmap_all_401p.pdf")
+heatmap.plus(as.matrix(b),
+             Colv=NA,
+             Rowv=NA,
+             col=jet.colors(75),
+             cexCol = 0.5,
+             labRow = NA,
+             #labCol = NA,
+             RowSideColors = rlab,
+             ColSideColors = clab,
+             scale = "none")
+dev.off()
+
+
+### CTCF cluster of genes
+b <- subset(ctcf.all, DiffMean < -50)
+b <- b[,c(4,6,8,15,16,17,13,14)]
+aux <- hclust(dist(b))
+chromHMM.order <- chromHMM[rownames(b),]
+clab <- cbind(c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"),c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"))
+rlab <- as.matrix(sapply(chromHMM.order, as.character))
+heatmap.plus(as.matrix(b),
+             Colv=NA,
+             Rowv=as.dendrogram(aux),
+             col=jet.colors(75),
+             cexCol = 0.5,
+             labRow = NA,
+             #labCol = NA,
+             RowSideColors = rlab,
+             ColSideColors = clab,
+             scale = "none")
+
+### Test to see which probes are from these group
+b <- subset(ctcf.all, DiffMean < -50)
+b <- b[,c(4,6,8,15,16,17,13,14)]
+aux <- hclust(dist(b))
+cut <- as.data.frame(cutree(aux,k=2))
+colnames(cut) <- "groups"
+aux <- subset(cut,groups %in% 2)
+b <- ctcf.all[rownames(aux),c(4,6,8,15,16,17,13,14)]
+chromHMM.order <- chromHMM[rownames(b),]
+clab <- cbind(c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"),c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"))
+rlab <- as.matrix(sapply(chromHMM.order, as.character))
+heatmap.plus(as.matrix(b),
+             Colv=NA,
+             #Rowv=as.dendrogram(aux),
+             col=jet.colors(75),
+             cexCol = 0.5,
+             labRow = NA,
+             #labCol = NA,
+             RowSideColors = rlab,
+             ColSideColors = clab,
+             scale = "none")
+
+
+ctcf.loss <- subset(ctcf.all, DiffMean < -50)
+ctcf.loss$chrom <- factor(ctcf.loss$chrom)
+
+a <- ctcf.loss[rownames(aux),]
+a <- subset(lost, id %in% as.character(a$CTCF_id)) #loss 47 CTCF in 82 CpGs
+
+genes_hg19 <- read.table("/home/thais/Dropbox/Galaxy1-[Homo_sapiens_genes_(GRCh37.p13)].tabular",header=TRUE,sep="\t")
+genes_hg19 <- genes_hg19[genes_hg19$Chromosome.Name %in% c(1:22,"X","Y"),]
+genes_hg19 <- genes_hg19[!is.na(genes_hg19$EntrezGene.ID),]
+genes_hg19 <- genes_hg19[!duplicated(genes_hg19$EntrezGene.ID),] #the duplicates are different transcripts, not different coordinates
+gene.GR <- GRanges(seqnames = paste0("chr",genes_hg19$Chromosome.Name),ranges = IRanges(start = genes_hg19$Gene.Start..bp., end=genes_hg19$Gene.End..bp.), strand = genes_hg19$Strand, symbol = genes_hg19$Associated.Gene.Name, EntrezID = genes_hg19$EntrezGene.ID)
+
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start-1000000, end=a$start))
+symbol <- as.data.frame(subsetByOverlaps(gene.GR,aux.GR))$symbol
+
+b <- r[rownames(r) %in% symbol,] #tabela de gene expression (pvalue e fold-change do Michele (rnaseq+microarray)
+b <- subset(b, abs(DM) > 1.2 & fdr < 0.05)
+symbol <- rownames(b)
+
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+
+low.m$subtype <- "G-CIMP.low"
+high.m$subtype <- "G-CIMP.high"
+all <- rbind(low.m,high.m)
+all$value <- all$value + 1
+all$value <- log10(all$value)
+all <- na.omit(all)
+all$subtype <- as.factor(all$subtype)
+all$subtype <- factor(all$subtype, levels = c("G-CIMP.low","G-CIMP.high"))
+
+ggplot(all, aes(factor(subtype), value,fill = subtype)) + 
+  geom_boxplot()  + 
+  geom_jitter() +
+  facet_wrap( ~ symbol,scales="free") +
+  scale_fill_manual(values = c("darkgreen","firebrick")) 
+
+# Consensus Cluster (Kmeans) in these 401 CpGs in CTCF differentially methylated between GCIMP low and high
+b <- subset(ctcf.all, abs(DiffMean) > 50)
+b <- b[,c(4,6,8,15,16,17,13,14)]
+b <- na.omit(b) #lost 12 probes: 4 in gain and 8 in loss
+
+library(ConsensusClusterPlus)
+title="/home/thais/CTCF_IDHmutGliomas/CC_401Diffp_in_CTCF"
+setwd(title)
+cc.401p <- ConsensusClusterPlus(d=t(b), 
+                                maxK=8, 
+                                reps=1000, 
+                                pItem=0.8, 
+                                pFeature=1,
+                                title=title, 
+                                clusterAlg="km",
+                                distance="euclidean",
+                                seed=1022,
+                                plot="pdf",
+                                verbose = TRUE)
+ccICL = calcICL(cc.401p, plot='pdf')
+cc.401p.2 <- cbind(as.matrix(cc.401p[[2]][[3]]), 
+                   as.matrix(cc.401p[[3]][[3]]), 
+                   as.matrix(cc.401p[[4]][[3]]), 
+                   as.matrix(cc.401p[[5]][[3]]),
+                   as.matrix(cc.401p[[6]][[3]]),
+                   as.matrix(cc.401p[[7]][[3]]),
+                   as.matrix(cc.401p[[8]][[3]]))
+
+
+
+cc.401p.2 <- as.data.frame(cc.401p.2)
+names(cc.401p.2) <- c("K2",  "K3",  "K4" , "K5" , "K6" , "K7",  "K8")
+
+#CpG island from UCSC - Download em 24/02/2016 (hg19)
+islands <- read.table("/home/thais/GBM WGBS/CpG_island.txt")
+colnames(islands) <- c("chrom","start","end","id")
+b <- ctcf.all
+b$CpG_type <- "CpG_openSea"
+aux.GR <- GRanges(seqnames = as.character(b$chrom),ranges = IRanges(start = b$start, end=b$end))
+aux <- findOverlaps(aux.GR,makeGRangesFromDataFrame(islands),type="within")
+b[queryHits(aux),"CpG_type"] <- "CpG.island"
+shore <- islands[,c(1,2,4)]
+shore$startS <- shore$start - 2000
+shore <- shore[,c(1,4,2,3)]
+aux <- islands[,c(1,3,4)]
+aux$end2 <- aux$end + 2000
+aux <- aux[,c(1,2,4,3)]
+colnames(shore) <- c("chrom","start","end","id")
+colnames(aux) <- c("chrom","start","end","id")
+shore <- rbind(shore,aux)
+aux <- findOverlaps(aux.GR,makeGRangesFromDataFrame(shore),type="within")
+b[queryHits(aux),"CpG_type"] <- ifelse(b[queryHits(aux),"CpG_type"] %in% "CpG.island","CpG.island","CpG.shore")
+#ctcf.all <- b
+
+b <- subset(ctcf.all, abs(DiffMean) > 50)
+b <- b[,c(4,6,8,15,16,17,13,14)]
+b <- na.omit(b) #lost 12 probes: 4 in gain and 8 in loss
+b.order <- b[cc.401p[[5]][[2]][[3]],]
+chromHMM.order <- chromHMM[rownames(b.order),]
+clab <- cbind(c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"),c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"))
+rlab <- as.matrix(sapply(chromHMM.order, as.character))
+rlab <- cbind(rlab, cc.401p.2[rownames(b.order),"K5"])
+aux <- as.factor(ctcf.all[rownames(b.order),"CpG_type"])
+levels(aux) <- c("black","gray","white")
+rlab <- cbind(rlab, as.character(aux))
+heatmap.plus(as.matrix(b.order),
+             Colv=NA,
+             Rowv=NA,
+             col=jet.colors(75),
+             cexCol = 0.5,
+             labRow = NA,
+             #labCol = NA,
+             RowSideColors = rlab,
+             ColSideColors = clab,
+             scale = "none")
+
+#Get the genes and probes based on Consensus clustering
+genes_hg19 <- read.table("/home/thais/Dropbox/Galaxy1-[Homo_sapiens_genes_(GRCh37.p13)].tabular",header=TRUE,sep="\t")
+genes_hg19 <- genes_hg19[genes_hg19$Chromosome.Name %in% c(1:22,"X","Y"),]
+genes_hg19 <- genes_hg19[!is.na(genes_hg19$EntrezGene.ID),]
+genes_hg19 <- genes_hg19[!duplicated(genes_hg19$EntrezGene.ID),] #the duplicates are different transcripts, not different coordinates
+gene.GR <- GRanges(seqnames = paste0("chr",genes_hg19$Chromosome.Name),ranges = IRanges(start = genes_hg19$Gene.Start..bp., end=genes_hg19$Gene.End..bp.), strand = genes_hg19$Strand, symbol = genes_hg19$Associated.Gene.Name, EntrezID = genes_hg19$EntrezGene.ID)
+
+aux <- names(cc.401p[[5]][[3]][cc.401p[[5]][[3]] == 1]) #loss: 1,2,3 gain: 4,5
+a <- ctcf.all[(aux),]
+a <- subset(lost, id %in% as.character(a$CTCF_id)) 
+
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start-1000000, end=a$start))
+aux2.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$end, end=a$end+1000000))
+aux.GR <- c(aux.GR,aux2.GR)
+symbol <- as.data.frame(subsetByOverlaps(gene.GR,aux.GR))$symbol
+
+#load("/home/thais/LGG-GBM/wtest-GCIMPlowVSG-CIMPligh.RData")
+#b <- r[rownames(r) %in% symbol,] #tabela de gene expression (pvalue e fold-change do Michele (rnaseq+microarray)
+#b <- subset(b, DM > 1.0 & fdr < 0.05) #loss: 1 (-1.0),2(-1.0),3(-1.0) gain: 4(1.5),5(1.5)
+
+#load("/home/thais/GBM WGBS/teste_lowXhigh_rnaseq_Newnorm.rda")
+b <- lowXhigh_RNAseq[rownames(lowXhigh_RNAseq) %in% symbol,]
+b <- subset(b, DiffMean > 1.5 & p.value.adj < 0.01) #all DM 1.5 and fdr 0.01
+symbol <- rownames(b)
+normal.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,1:5]
+normal.mrna <- normal.mrna+1
+normal.mrna <- log2(normal.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+low.mrna <- low.mrna+1
+low.mrna <- log2(low.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+high.mrna <- high.mrna+1
+high.mrna <- log2(high.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("IDHmut-codel"))$case.id)
+codel.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+codel.mrna <- codel.mrna+1
+codel.mrna <- log2(codel.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Classic-like"))$case.id)
+classic.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+classic.mrna <- classic.mrna+1
+classic.mrna <- log2(classic.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Mesenchymal-like"))$case.id)
+mes.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+mes.mrna <- mes.mrna+1
+mes.mrna <- log2(mes.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-GBM"))$case.id)
+lgm6.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+lgm6.mrna <- lgm6.mrna+1
+lgm6.mrna <- log2(lgm6.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-LGG"))$case.id)
+pa.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+pa.mrna <- pa.mrna+1
+pa.mrna <- log2(pa.mrna)
+
+normal.mrna$symbol <- rownames(normal.mrna)
+normal.m <- melt(normal.mrna,id="symbol")
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+codel.mrna$symbol <- rownames(codel.mrna)
+codel.m <- melt(codel.mrna,id="symbol")
+classic.mrna$symbol <- rownames(classic.mrna)
+classic.m <- melt(classic.mrna,id="symbol")
+mes.mrna$symbol <- rownames(mes.mrna)
+mes.m <- melt(mes.mrna,id="symbol")
+lgm6.mrna$symbol <- rownames(lgm6.mrna)
+lgm6.m <- melt(lgm6.mrna,id="symbol")
+pa.mrna$symbol <- rownames(pa.mrna)
+pa.m <- melt(pa.mrna,id="symbol")
+
+normal.m$Subtype <- "Non-tumor Brain"
+low.m$Subtype <- "GCIMP-low"
+high.m$Subtype <- "GCIMP-high"
+codel.m$Subtype <- "IDHmut-codel"
+classic.m$Subtype <- "Classic-like"
+mes.m$Subtype <- "Mesenchymal-like"
+lgm6.m$Subtype <- "LGm6-GBM"
+pa.m$Subtype <- "PA-like"
+all <- Reduce(rbind,list(normal.m,low.m,high.m,codel.m,classic.m, mes.m, lgm6.m,pa.m))
+all$Subtype <- as.factor(all$Subtype)
+all$Subtype <- factor(all$Subtype, levels = c("Non-tumor Brain","GCIMP-low","GCIMP-high","IDHmut-codel","Classic-like","Mesenchymal-like","LGm6-GBM","PA-like"))
+
+#plot gene expression
+ggplot(all, aes(Subtype, value,fill = Subtype)) + 
+  geom_boxplot(outlier.shape=NA)  + 
+  geom_jitter() +
+  facet_wrap( ~ symbol,scales="free") +
+  theme(axis.text.x = element_blank(),strip.text = element_text(size=25),axis.text.y = element_text(size=20),legend.text=element_text(size=25),legend.title=element_text(size=25),legend.key.size=unit(2,"cm")) +
+  scale_fill_manual(values = c("gray","darkgreen","firebrick","#9f20f0","#ffa500","#FFFF00","#006680","#00CCFF"))  #salvar 15 por 10 em pdf ou 2500 por 1500 em png
+
+#plot only the dna methylation
+b <- subset(ctcf.all, abs(DiffMean) > 50)
+b <- b[,c(4,6,8,15,16,17,13,14)]
+b <- na.omit(b) #lost 12 probes: 4 in gain and 8 in loss
+b.order <- b[cc.401p[[5]][[2]][[3]],]
+#b.order <- b.order[313:389,] #loss: 1(313:389),2(234:312),3(170:233)  gain: 4(43:169),5(1:42)
+chromHMM.order <- chromHMM[rownames(b.order),]
+clab <- cbind(c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"),c("darkgreen","firebrick","firebrick","black","black","black","gray","gray"))
+rlab <- as.matrix(sapply(chromHMM.order, as.character))
+rlab <- cbind(rlab, cc.401p.2[rownames(b.order),"K5"])
+heatmap.plus(as.matrix(b.order),
+             Colv=NA,
+             Rowv=NA,
+             col=jet.colors(75),
+             cexCol = 0.5,
+             #labRow = NA,
+             #labCol = NA,
+             RowSideColors = rlab,
+             ColSideColors = clab,
+             scale = "none")   #salvar 10 por 10
+
+z <- seq(min(b.order,na.rm=TRUE), max(b.order,na.rm=TRUE), length = 200) #min(lgg.gbm.27.450.order) and #max(lgg.gbm.27.450.order)
+n <- max(b.order,na.rm=TRUE)
+pdf("key.pdf",width=10, height=05,bg = "transparent")
+image(matrix(z, ncol = 1), col = jet.colors(75),
+      xaxt = "n", yaxt = "n", main = "Overlap count Key")
+box()
+par(usr = c(0, n, 0, n))
+axis(1, at = c(0,max(z)), c(min(z),max(z)))
+dev.off()
+
+##Check the DNA methylation at all CpGs in the CTCF differentially methylated
+b <- subset(ctcf.all, abs(DiffMean) > 50)
+b <- na.omit(b) #lost 12 probes: 4 in gain and 8 in loss
+b.order <- b[cc.401p[[5]][[2]][[3]],]
+b.order <- b.order[1:42,] #loss: 1(313:389),2(234:312),3(170:233)  gain: 4(43:169),5(1:42)
+b <- subset(ctcf.all, CTCF_id %in% as.character(b.order$CTCF_id)) #get all the CpGs in these CTCF binding sites
+b$id <- 1:nrow(b)
+b <- melt(b[,c(4,6,8,15,16,17,13,14,18,12)],id=c("id","CTCF_id"))
+
+ggplot(b,aes(x=id,y=value,color=variable))+geom_point()+geom_line(size=3)+scale_color_manual(values=c("darkgreen","firebrick","firebrick","black","black","black","gray","gray")) + facet_wrap(~ CTCF_id,scales="free")
+
+#orphan CpGs in HMDs
+setwd("/home/thais/GBM WGBS/PMD_Huy_AllTissues")
+orphanCpGs <- read.table("orphanCpG_hg19_35bp.bed")
+load("/home/thais/GBM WGBS/all.rda")
+PMDs <- read.table("commonPMD_allCpG_CenRemoved.bed")
+HMDs <- read.table("commonHMD_allCpG_CenRemoved.bed")
+orphanCpGs$inCommomHMD <- "No"
+orphanCpGs$inCommomPMD <- "No"
+a <- GRanges(seqnames = as.character(orphanCpGs$V1),ranges = IRanges(start = orphanCpGs$V2, end=(orphanCpGs$V2+1)))
+gr <- GRanges(seqnames = as.character(PMDs$V1),ranges = IRanges(start = PMDs$V2, end=PMDs$V3))
+aux <- findOverlaps(a,gr)
+orphanCpGs[queryHits(aux),"inCommomPMD"] <- "Yes"
+gr <- GRanges(seqnames = as.character(HMDs$V1),ranges = IRanges(start = HMDs$V2, end=HMDs$V3))
+aux <- findOverlaps(a,gr)
+orphanCpGs[queryHits(aux),"inCommomHMD"] <- "Yes"
+orphanCpGs$V1 <- factor(orphanCpGs$V1, levels = paste0("chr",c(1:22,"X","Y")))
+PMDs$V1 <- factor(PMDs$V1, levels = paste0("chr",c(1:22,"X")))
+HMDs$V1 <- factor(HMDs$V1, levels = paste0("chr",c(1:22,"X","Y")))
+
+tudao$start <- as.numeric(as.character(tudao$start))
+tudao$end <- as.numeric(as.character(tudao$end))
+t.subset <- subset(tudao, chrom %in% paste0("chr",c(1:22,"X","Y")))
+t.subset$chrom <- factor(t.subset$chrom)
+t.subset$chrom <- factor(t.subset$chrom, levels = paste0("chr",c(1:22,"X","Y")))
+t.subset$orphanCpG <- "No"
+t.subset$inCommomPMD <- "No"
+t.subset$inCommomHMD <- "No"
+
+
+t.GR <- makeGRangesFromDataFrame(t.subset,
+                                 keep.extra.columns=TRUE)
+gr <- GRanges(seqnames = as.character(orphanCpGs$V1),ranges = IRanges(start = orphanCpGs$V2, end=(orphanCpGs$V2+1)))
+aux <- findOverlaps(t.GR,gr)
+t.subset[queryHits(aux),"orphanCpG"] <- "Yes"
+
+gr <- GRanges(seqnames = as.character(PMDs$V1),ranges = IRanges(start = PMDs$V2, end=PMDs$V3))
+aux <- findOverlaps(t.GR,gr)
+t.subset[queryHits(aux),"inCommomPMD"] <- "Yes"
+
+gr <- GRanges(seqnames = as.character(HMDs$V1),ranges = IRanges(start = HMDs$V2, end=HMDs$V3))
+aux <- findOverlaps(t.GR,gr)
+t.subset[queryHits(aux),"inCommomHMD"] <- "Yes"
+
+t.subset$orphanCpG_in_PMDs <- "Other CpGs"
+t.subset$orphanCpG_in_HMDs <- "Other CpGs"
+t.subset$orphanCpG_in_PMDs <- ifelse(t.subset$orphanCpG %in% "Yes" & t.subset$inCommomPMD %in% "Yes", "orphan CpGs in PMDs","Other CpGs")
+t.subset$orphanCpG_in_HMDs <- ifelse(t.subset$orphanCpG %in% "Yes" & t.subset$inCommomHMD %in% "Yes", "orphan CpGs in HMDs","Other CpGs")
+
+setwd("/home/thais/GBM WGBS/PMD_Huy_AllTissues/orphanCpGs_in_HMDs/")
+for (i in 1:nlevels(t.subset$chrom)){
+  aux <- subset(t.subset, chrom %in% levels(t.subset$chrom)[i])
+  
+  ggplot(aux, aes(percentMeth.0128, mean_GCIMP.high)) + 
+    #geom_point(aes(color=orphanCpG_in_HMDs)) + 
+    geom_point() + 
+    facet_wrap( ~ orphanCpG_in_HMDs, scales = "free") + 
+    #scale_colour_manual(values=c("darkgray","red")) +
+    labs(title=levels(t.subset$chrom)[i],x="GCIMP-low",y="GCIMP-high (mean)",colour="orphan CpG in HMDs")
+  ggsave(paste0(levels(t.subset$chrom)[i],".png"),width = 12, height = 7)
+}
+
+#orphan CpGs in PMDs
+setwd("/home/thais/GBM WGBS/PMD_Huy_AllTissues/orphanCpGs_in_PMDs/")
+for (i in 1:nlevels(t.subset$chrom)){
+  aux <- subset(t.subset, chrom %in% levels(t.subset$chrom)[i])
+  
+  ggplot(aux, aes(percentMeth.0128, mean_GCIMP.high)) + 
+    #geom_point(aes(color=orphanCpG_in_PMDs)) + 
+    geom_point() + 
+    facet_wrap(chrom ~ orphanCpG_in_PMDs) + 
+    #scale_colour_manual(values=c("darkgray","red")) +
+    labs(title=levels(t.subset$chrom)[i],x="GCIMP-low",y="GCIMP-high (mean)",colour="orphan CpG in PMDs")
+  ggsave(paste0(levels(t.subset$chrom)[i],".png"),width = 12, height = 7)
+}
+
+# Ratio between expected and observed orphan CpGs in PMDs
+setwd("/home/thais/GBM WGBS/PMD_Huy_AllTissues/orphanCpGs_in_PMDs/")
+expected <- table(orphanCpGs$inCommomPMD,orphanCpGs$V1) 
+expected <- prop.table(expected,2) #orphan CpGs in Common PMDs by Chromosome
+
+observed <- table(t.subset$inCommomPMD,t.subset$chrom) 
+observed <- prop.table(observed,2) #orphan CpGs in Common PMDs by Chromosome
+
+a <- observed - expected
+a <- a[1,] #difference of observed in WGBS CpGs in Common PMDs by Chromosome vs expected CpGs in Common PMDs by Chromosome
+a <- as.data.frame(a)
+
+b <- subset(t.subset, abs(DiffMean) > 90)
+observed <- table(b$inCommomPMD,b$chrom) 
+observed <- prop.table(observed,2) #orphan CpGs in Common PMDs by Chromosome
+b <- observed - expected
+b <- b[1,]
+b <- as.data.frame(b)
+
+a$type <- "All CpGs (Genome-wide)"
+a$chrom <- rownames(a)
+b$type <- "CpGs with DNA methylation difference > 50% (n=12,010)"
+b$chrom <- rownames(b)
+colnames(a)[1] <- "b"
+a <- rbind(a,b)
+a$b <- a$b*100
+a$chrom <- as.factor(a$chrom)
+a$chrom <- factor(a$chrom, levels = paste0("chr",c(1:22,"X","Y")))
+
+ggplot(a, aes(x = chrom,y=b)) + 
+  geom_bar(stat="identity",position = "identity") + 
+  facet_wrap(~ type) + 
+  labs(title="Percentage of orphan CpGs in PMDs",x="Chromosome",y="Difference") +
+  ylim(-15,41)
+ggsave("ratio_PMDs.png",width = 15, height = 9)
+
+# Ratio between expected and observed orphan CpGs in HMDs
+setwd("/home/thais/GBM WGBS/PMD_Huy_AllTissues/orphanCpGs_in_HMDs/")
+expected <- table(orphanCpGs$inCommomHMD,orphanCpGs$V1) 
+expected <- prop.table(expected,2) #orphan CpGs in Common HMDs by Chromosome
+
+observed <- table(t.subset$inCommomHMD,t.subset$chrom) 
+observed <- prop.table(observed,2) #orphan CpGs in Common HMDs by Chromosome
+
+a <- observed - expected
+a <- a[1,] #difference of observed in WGBS CpGs in Common HMDs by Chromosome vs expected CpGs in Common HMDs by Chromosome
+a <- as.data.frame(a)
+
+b <- subset(t.subset, abs(DiffMean) > 90)
+observed <- table(b$inCommomHMD,b$chrom) 
+observed <- prop.table(observed,2) #orphan CpGs in Common HMDs by Chromosome
+b <- observed - expected
+b <- b[1,]
+b <- as.data.frame(b)
+
+a$type <- "All CpGs (Genome-wide)"
+a$chrom <- rownames(a)
+b$type <- "CpGs with DNA methylation difference > 50% (n=12,010)"
+b$chrom <- rownames(b)
+colnames(a)[1] <- "b"
+a <- rbind(a,b)
+a$b <- a$b*100
+a$chrom <- as.factor(a$chrom)
+a$chrom <- factor(a$chrom, levels = paste0("chr",c(1:22,"X","Y")))
+
+ggplot(a, aes(x = chrom,y=b)) + 
+  geom_bar(stat="identity",position = "identity") + 
+  facet_wrap(~ type) + 
+  labs(title="Percentage of orphan CpGs in HMDs",x="Chromosome",y="Difference") +
+  ylim(-15,41)
+ggsave("ratio_HMDs.png",width = 15, height = 9)
+
+##Statistical test between low and high of all genes in chr 14 (enhancer)
+load("teste_rna.rda")
+b <- subset(volcano, DiffMean > 1 & p.value.adj < 0.05) 
+symbol <- rownames(b)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- as.character(subset(pd, IDH.status %in% c("WT"))$case.id)
+others <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+others$symbol <- rownames(others)
+others.m <- melt(others,id="symbol")
+low.m$subtype <- "G-CIMP.low"
+high.m$subtype <- "G-CIMP.high"
+others.m$subtype <- "IDH-wt"
+all <- rbind(low.m,high.m)
+all <- rbind(all,others.m)
+all$value <- all$value + 1
+all$value <- log10(all$value)
+all <- na.omit(all)
+all$subtype <- as.factor(all$subtype)
+all$subtype <- factor(all$subtype, levels = c("G-CIMP.low","G-CIMP.high","IDH-wt"))
+
+ggplot(all, aes(factor(subtype), value,fill = subtype)) +
+geom_boxplot()  +
+geom_jitter() +
+facet_wrap( ~ symbol,scales="free") +
+scale_fill_manual(values = c("darkgreen","firebrick","gray"))  #salvar 15 por 10
+
+##FOXA1 target genes - Supp. table from http://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-680
+symbol <- read.delim("/home/thais/CTCF_IDHmutGliomas/CC_401Diffp_in_CTCF/FOXA1_targetGenes_fromWangEtAl2013.txt")
+symbol <- as.character(symbol$FOXA1_target)
+
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- hclust(dist(t(low.mrna)))
+low.mrna <- low.mrna[,aux$order]
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+aux <- hclust(dist(t(high.mrna)))
+high.mrna <- high.mrna[,aux$order]
+all <- cbind(low.mrna,high.mrna)
+
+all <- all + 1
+all <- log10(all)
+
+
+#all samples
+heatmap.plus(as.matrix(all),
+             col = greenred(75),
+             scale = "row",
+             # labRow = NA,
+             #labCol = NA,
+             Colv = NA,
+             #Rowv = NA,
+             ColSideColors = cbind(c(rep("darkgreen",ncol(low.mrna)),(rep("firebrick",ncol(high.mrna)))),c(rep("darkgreen",ncol(low.mrna)),(rep("firebrick",ncol(high.mrna))))),
+             margins = c(1, 6)
+             #RowSideColors = rlab
+             
+)
+
+
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+low.mrna <- apply(low.mrna,1,mean,na.rm=TRUE)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[rownames(rna.seq.lgg.gbm) %in% symbol,colnames(rna.seq.lgg.gbm) %in% aux]
+high.mrna <- apply(high.mrna,1,mean,na.rm=TRUE)
+all <- cbind(low.mrna,high.mrna)
+
+all <- all + 1
+all <- log10(all)
+
+#mean
+heatmap.plus(as.matrix(all),
+             col = greenred(75),
+             scale = "row",
+             # labRow = NA,
+             #labCol = NA,
+             Colv = NA,
+             #Rowv = NA,
+             ColSideColors = cbind(c("darkgreen","firebrick"),c("darkgreen","firebrick")),
+             margins = c(1, 6)
+             #RowSideColors = rlab
+             
+)
+
+#### Get DEGs between GCIMP-low/high genome-wide and run Homer on the promoter regions of theses genes (1000bp upstream the TSS and 100bp downstream)
+load("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM//RNAseq_05-11-14/rnaSeqNorm.Rda")
+load("/home/thais/LGG-GBM/LGG-GBM.merged.data.FB20150930v3.Rdata") #pdata from Sep 2015 (LGG-GBM project). Created by Floris Barthel
+
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.lgg.gbm[,colnames(rna.seq.lgg.gbm) %in% aux]
+low.mrna <- low.mrna+1
+low.mrna <- log10(low.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.lgg.gbm[,colnames(rna.seq.lgg.gbm) %in% aux]
+high.mrna <- high.mrna+1
+high.mrna <- log10(high.mrna)
+
+volcano <- cbind(low.mrna,high.mrna)
+
+values <- t(na.omit(volcano))
+values <- data.frame(values)
+require(exactRankTests)
+require(parallel)
+w.p.values <- unlist(mclapply(values,
+                              function(probe) {
+                                zz <- t.test(as.matrix(probe[1:17]),as.matrix(probe[18:251])) 
+                                z <- zz$p.value
+                                return(z)
+                              }, mc.cores=12))
+
+w.p.values.adj <- p.adjust(w.p.values, method = "BH")
+
+volcano$meanM1 <- apply(volcano[,1:17],1,mean,na.rm=T)
+volcano$meanM2 <- apply(volcano[,18:251],1,mean,na.rm=T)
+volcano$DiffMean <- volcano$meanM1 - volcano$meanM2
+volcano$p.value.adj <- w.p.values.adj
+volcano$p.value <- w.p.values
+#save(volcano,file="/home/thais/GBM WGBS/teste_lowXhigh_rnaseq.rda")
+
+symbol <- rownames(subset(volcano, p.value.adj < 0.05 & abs(DiffMean) > 1.0)) #100 genes
+
+genes_hg19 <- read.table("/home/thais/Dropbox/Galaxy1-[Homo_sapiens_genes_(GRCh37.p13)].tabular",header=TRUE,sep="\t")
+genes_hg19 <- genes_hg19[genes_hg19$Chromosome.Name %in% c(1:22,"X","Y"),]
+genes_hg19 <- genes_hg19[!is.na(genes_hg19$EntrezGene.ID),]
+genes_hg19 <- genes_hg19[!duplicated(genes_hg19$EntrezGene.ID),] #the duplicates are different transcripts, not different coordinates
+
+aux <- subset(genes_hg19, Associated.Gene.Name %in% symbol)
+aux <- aux[!duplicated(aux$Associated.Gene.Name),]
+up <- aux[,c(3,4,7)]
+up$start <- up$Gene.Start..bp. - 1000
+up <- up[,c(1,4,2,3)]
+down <- aux[,c(3,5,7)]
+down$end <- down$Gene.End..bp. + 100
+down <- down[,c(1,2,4,3)]
+colnames(up) <- c("chrom","start","end","symbol")
+colnames(down) <- c("chrom","start","end","symbol")
+aux <- rbind(up,down)
+aux$chrom <- paste0("chr",as.character(aux$chrom))
+aux <- cbind(aux,id=paste0("id",1:nrow(aux)))
+aux <- aux[,c(1,2,3,5,4)]
+write.table(aux,file="/home/thais/CTCF_IDHmutGliomas/CC_401Diffp_in_CTCF/Homer/homer_DEGs_1000up_100dw.bed",quote=F,row.names=FALSE,sep="\t") 
+
+### RNA seq data - LGG + GBM + Non-tumor brain (from TCGA, n=5) - normalization
+id.mrna <- read.delim("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RNAseq_05-11-14/gbm_file_manifest.txt")
+rownames(id.mrna) <- id.mrna$File.Name
+gbm.mrna = NULL
+pattern.primary = 'TCGA-([0-9A-Z]{2})-([0-9A-Z]{1,})-([0-1A-Z]{3})-([0-9A-Z]{3})-([0-9A-Z]{4}-([0-9]{2}))' #barcode
+files = list.files("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RNAseq_05-11-14/gbm_RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/GBM_Genes_normalized") 
+setwd("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RNAseq_05-11-14/gbm_RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/GBM_Genes_normalized")
+z = 1 #first file
+while (!is.na(files[z])) {
+  aux <- id.mrna[as.character(files[z]),"Barcode"]
+  c <- str_extract(as.character(aux), pattern.primary)
+  if(!is.na(c)){ #do not read metadata files and non-tumor samples
+    if(is.null(gbm.mrna)){ #read the first sample
+      gbm.mrna = read.table(files[z],sep="\t",header=TRUE) 
+      colnames(gbm.mrna)[2] <- as.character(c)
+      gbm.mrna <- gbm.mrna[,c(1,2)]
+    } 
+    else{
+      aux = read.table(files[z], header=TRUE,sep="\t")
+      colnames(aux)[2] = c
+      gbm.mrna = merge(gbm.mrna, aux[1:2], by="gene_id")
+    }
+  }
+  z = z + 1 #next file
+}#end while
+# gbm -> 154 tumor samples
+
+#duplicated(substr(colnames(gbm.mrna),1,12)) #TCGA-06-0211 AND TCGA-06-0156
+gbm.mrna <- gbm.mrna[,-c(77,92)] #remove duas duplicatas
+colnames(gbm.mrna)[52] <- "TCGA-06-0211-01A-01R-1849-01"
+colnames(gbm.mrna)[71] <- "TCGA-06-0156-01A-03R-1849-01"
+
+lgg.mrna = NULL
+id.mrna <- read.delim("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RNAseq_05-11-14/lgg_file_manifest.txt")
+rownames(id.mrna) <- id.mrna$File.Name
+files = list.files("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RNAseq_05-11-14/lgg_RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/LGG_Genes_normalized") 
+setwd("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RNAseq_05-11-14/lgg_RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/LGG_Genes_normalized")
+z = 1 #first file
+while (!is.na(files[z])) {
+  aux <- id.mrna[as.character(files[z]),"Barcode"]
+  c <- str_extract(as.character(aux), pattern.primary)
+  if(!is.na(c)){ #do not read metadata files and non-tumor samples
+    if(is.null(lgg.mrna)){ #read the first sample
+      lgg.mrna = read.table(files[z],sep="\t",header=TRUE) 
+      colnames(lgg.mrna)[2] <- as.character(c)
+      lgg.mrna <- lgg.mrna[,c(1,2)]
+    }
+    else{
+      aux = read.table(files[z], header=TRUE,sep="\t")
+      colnames(aux)[2] = c
+      lgg.mrna = merge(lgg.mrna, aux[1:2], by="gene_id")
+    }
+  }
+  z = z + 1 #next file
+}#end while
+# lgg -> 514 tumor samples
+
+## Non-tumor brain from TCGA (GBM)
+normal.mrna = NULL
+id.mrna <- read.delim("/home/thais/NormalBrain_TCGA/RNAseq/file_manifest.txt")
+rownames(id.mrna) <- id.mrna$File.Name
+files = list.files("/home/thais/NormalBrain_TCGA/RNAseq/RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/Genes_results") 
+setwd("/home/thais/NormalBrain_TCGA/RNAseq/RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/Genes_results")
+z = 1 #first file
+while (!is.na(files[z])) {
+  aux <- id.mrna[as.character(files[z]),"Barcode"]
+  c <- as.character(aux)
+  if(!is.na(c)){ #do not read metadata files and non-tumor samples
+    if(is.null(normal.mrna)){ #read the first sample
+      normal.mrna = read.table(files[z],sep="\t",header=TRUE) 
+      colnames(normal.mrna)[2] <- as.character(c)
+      normal.mrna <- normal.mrna[,c(1,2)]
+    }
+    else{
+      aux = read.table(files[z], header=TRUE,sep="\t")
+      colnames(aux)[2] = c
+      normal.mrna = merge(normal.mrna, aux[1:2], by="gene_id")
+    }
+  }
+  z = z + 1 #next file
+}#end while
+# normal brain from GBM -> 5 samples
+
+
+
+load("/home/thais/LGG-GBM/LGG-GBM.merged.data.FB20150930v3.Rdata") #pdata from Sep 2015 (LGG-GBM project). Created by Floris Barthel
+colnames(gbm.mrna) <- substr(colnames(gbm.mrna),1,12)
+aux <- as.character(subset(pd, !is.na(clustM.olddiscovery))$case.id)
+gbm.mrna <- gbm.mrna[,colnames(gbm.mrna) %in% aux] #Remove GBMs that we don't have DNA methylation data. 155 to 123 samples
+gbm.mrna <- cbind(gene_id=lgg.mrna[,"gene_id"],gbm.mrna) #All LGGs we have DNA methylation data
+mrna <- merge(lgg.mrna,gbm.mrna,by="gene_id")
+mrna <- merge(normal.mrna,mrna,by="gene_id")
+colnames(mrna) <- substr(colnames(mrna),1,12)
+mrna <- mrna[,-which(names(mrna) %in% c("TCGA-HT-A61A"))] #remove this sample
+entrezID <- str_extract(mrna$gene_id,"[^|]*$")
+#entrezID[entrezID == "?"] <- str_extract(mrna$gene_id[1:29],"[^|]*$")
+#entrezID[entrezID == "SLC35E2"] <- c("SLC35E2.728661","SLC35E2.9906")
+mrna$entrezID <- as.matrix(entrezID)
+symbol <- str_extract(mrna$gene_id,"^*[^|]*")
+symbol[symbol == "?"] <- str_extract(mrna$gene_id[1:29],"[^|]*$")
+symbol[symbol == "SLC35E2"] <- c("SLC35E2.728661","SLC35E2.9906")
+rownames(mrna) <- symbol
+mrna$symbol <- as.matrix(symbol)
+
+rownames(mrna) <- as.character(mrna$symbol)
+mrna.all <- mrna[,-c(644)] #672 samples: 123 GBMs + 513 LGGs + 5 non-tumor brain
+
+
+#Tumor and Normal samples
+#load("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/RNAseq_05-11-14/geneInfo.RData") 
+#library("EDASeq")
+geneInfo <- na.omit(geneInfo)
+wwhich <- which(rownames(geneInfo) %in% rownames(mrna.all))
+geneInfo <- geneInfo[wwhich,]
+mrna.all <- mrna.all[rownames(geneInfo),]
+id <- mrna.all$entrezID
+mrna.all <- mrna.all[,-c(1,643)] #id column
+#geneInfo <- geneInfo[rownames(rna.seq.lgg.gbm),]
+ffData  <- as.data.frame(geneInfo)
+#rna.seq.lgg.gbm.norm <- floor(as.matrix(rna.seq.lgg.gbm[,1:636]))
+mrna.all <- floor(as.matrix(mrna.all))
+tmp <- newSeqExpressionSet(mrna.all, featureData = ffData)
+fData(tmp)[, "gcContent"] <- as.numeric(geneInfo[, "gcContent"])
+tmp <- withinLaneNormalization(tmp, "gcContent", which = "upper", offset = TRUE)
+tmp <- betweenLaneNormalization(tmp, which = "upper", offset = TRUE)
+########################
+normCounts <-  log(mrna.all + .1) + offst(tmp)
+normCounts <-  floor(exp(normCounts) - .1)
+library(steFunctions) # R package attached that contains the quantileNormalization function and other stuff
+tmp <- t(quantileNormalization(t(normCounts)))
+normCounts <- floor(tmp)
+rna.seq.LGG.GBM.normalBrain <- as.data.frame(normCounts)
+rna.seq.LGG.GBM.normalBrain$entrezID <- as.character(id)
+save(rna.seq.LGG.GBM.normalBrain,file="/home/thais/NormalBrain_TCGA/RNAseq/LGG_GBM_nonTumorBrain_RNAseqNorm.rda")
+mrna.all$entrezID <- as.character(id)
+save(mrna.all,file="/home/thais/NormalBrain_TCGA/RNAseq/LGG_GBM_nonTumorBrain_RNAseq_SemNorm.rda") #not normalized
+
+#t-test: GCIMP-low x high using RNAseq data only
+load("/home/thais/NormalBrain_TCGA/RNAseq/LGG_GBM_nonTumorBrain_RNAseqNorm.rda")
+load("/home/thais/LGG-GBM/LGG-GBM.merged.data.FB20150930v3.Rdata") #pdata from Sep 2015 (LGG-GBM project). Created by Floris Barthel
+
+
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.LGG.GBM.normalBrain[,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+low.mrna <- low.mrna+1
+low.mrna <- log2(low.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.LGG.GBM.normalBrain[,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+high.mrna <- high.mrna+1
+high.mrna <- log2(high.mrna)
+
+lowXhigh_RNAseq <- cbind(low.mrna,high.mrna)
+
+values <- t(na.omit(lowXhigh_RNAseq))
+values <- data.frame(values)
+require(parallel)
+w.p.values <- unlist(mclapply(values,
+                              function(probe) {
+                                zz <- t.test(as.matrix(probe[1:17]),as.matrix(probe[18:251])) 
+                                z <- zz$p.value
+                                return(z)
+                              }, mc.cores=12))
+
+w.p.values.adj <- p.adjust(w.p.values, method = "fdr")
+lowXhigh_RNAseq$meanM1 <- apply(lowXhigh_RNAseq[,1:17],1,mean,na.rm=T)
+lowXhigh_RNAseq$meanM2 <- apply(lowXhigh_RNAseq[,18:251],1,mean,na.rm=T)
+lowXhigh_RNAseq$DiffMean <- lowXhigh_RNAseq$meanM1 - lowXhigh_RNAseq$meanM2
+lowXhigh_RNAseq$p.value.adj <- w.p.values.adj
+lowXhigh_RNAseq$p.value <- w.p.values
+#save(lowXhigh_RNAseq,file="/home/thais/GBM WGBS/teste_lowXhigh_rnaseq_Newnorm.rda")
+
+##Wilcoxon test between all CpGs within the CTCF binding sites (low x high)
+b <- ctcf.all
+b$meanNormal <- apply(b[,c("percentMeth.59","percentMeth.60")],1,mean, na.rm=TRUE)
+b$meanMes <- apply(b[,c("percentMeth.1401","percentMeth.1454")],1,mean, na.rm=TRUE)
+lost <- read.table("/home/thais/CTCF_IDHmutGliomas/FromHuy/lost_in_idh1m_pt_2fc_qn_11.bed")
+colnames(lost) <- c("chrom","start","end","id","number","strand")
+lost$DiffMean <- NA
+lost$p.value_lowXhigh_DNAmeth <- NA
+for(i in 1:nlevels(as.factor(b$CTCF_id))){
+  aux <- subset(b, CTCF_id %in% levels(as.factor(b$CTCF_id))[i])
+  a <- mean(aux$percentMeth.0128) - mean(aux$mean_GCIMP.high)
+  aux <- melt(aux[,c("percentMeth.0128","mean_GCIMP.high")])
+  if(nrow(aux) > 1){ 
+    lost[lost$id %in% levels(as.factor(b$CTCF_id))[i],"p.value_lowXhigh_DNAmeth"] <- pvalue(wilcox_test(value ~ variable,aux))
+    lost[lost$id %in% levels(as.factor(b$CTCF_id))[i],"DiffMean"] <- a
+  }
+}
+lost$p.valueADJ_lowXhigh_DNAmeth <- p.adjust(lost$p.value_lowXhigh_DNAmeth,"fdr")
+
+#aux <- subset(lost, p.valueADJ_lowXhigh_DNAmeth < 0.05 & abs(DiffMean) > 45)$id #13 CTCF binding sites e 108 CpGs
+aux <- subset(lost, p.valueADJ_lowXhigh_DNAmeth < 0.05 & DiffMean < 0)$id #83 CTCF binding sites e 1044 CpGs
+c <- subset(b, CTCF_id %in% aux) 
+
+c$id <- 1:nrow(c) #está na ordem:  identical(b,b[with(b,(order(chrom,start))),]) TRUE
+c <- melt(c[,c(4,10,19,15,18,12,20)],id=c("id","CTCF_id"))
+c$CTCF_id <- as.factor(c$CTCF_id)
+##HYPO LOW: 
+c$CTCF_id <- factor(c$CTCF_id, levels = c("Merged-chr1-13870625-8","Merged-chr1-32180118-5","Merged-chr1-41961979-1","Merged-chr1-162792644-1","Merged-chr2-8685219-5","Merged-chr2-235166964-7","Merged-chr4-657658-3","Merged-chr4-8505751-2","Merged-chr4-130017468-1","Merged-chr6-11242095-6","Merged-chr7-1546746-2","Merged-chr8-61880356-2","Merged-chr8-121605574-3","Merged-chr9-89260414-2","Merged-chr9-92239181-6","Merged-chr9-127191825-3","Merged-chr10-19918640-4","Merged-chr11-102139653-5","Merged-chr12-2749660-4","Merged-chr12-123560211-3","Merged-chr12-125212011-3","Merged-chr16-27791386-5","Merged-chr16-69516073-3","Merged-chr17-41446241-2","Merged-chr19-2065088-1","Merged-chr21-36423697-5","Merged-chr21-44839518-2","Merged-chr21-45592811-1","Merged-chr22-17847976-3","Merged-chr22-29598765-5"))
+##HYPER LOW: 
+#c$CTCF_id <- factor(c$CTCF_id, levels = c("Merged-chr1-28286659-3","Merged-chr1-32181417-8","Merged-chr1-41889258-3","Merged-chr1-50798844-7","Merged-chr1-52834126-3","Merged-chr1-53387473-8","Merged-chr1-59612568-3","Merged-chr1-63539870-4","Merged-chr1-68517448-5","Merged-chr1-146009551-3","Merged-chr1-212838746-10","Merged-chr2-26726435-9","Merged-chr2-133426233-6","Merged-chr2-201450594-3","Merged-chr2-201983356-6","Merged-chr2-219157325-10","Merged-chr2-242786385-1","Merged-chr3-9988323-9","Merged-chr3-9988985-4","Merged-chr4-89378015-9","Merged-chr4-121991991-3","Merged-chr4-128544117-4","Merged-chr4-154713674-5","Merged-chr5-43020283-9","Merged-chr5-73938032-7","Merged-chr5-139525544-4","Merged-chr6-1555477-9","Merged-chr6-43970674-3","Merged-chr6-108455150-2","Merged-chr6-134499761-7","Merged-chr7-28995813-5","Merged-chr7-55087998-3","Merged-chr7-128509712-1","Merged-chr8-81599591-6","Merged-chr9-100069506-3","Merged-chr9-132146049-3","Merged-chr11-64110056-3","Merged-chr11-102188128-3","Merged-chr11-116228940-5","Merged-chr11-129873605-3","Merged-chr12-58119976-10","Merged-chr15-65128137-8","Merged-chr16-29796563-10","Merged-chr17-15165845-1","Merged-chr17-44026596-8","Merged-chr17-48194740-5","Merged-chr17-58498819-11","Merged-chr18-5890727-4","Merged-chr18-61616501-3","Merged-chr19-7934221-7","Merged-chr21-36399183-1","Merged-chrX-117973428-9","Merged-chrX-130927246-4"))
+ggplot(c,aes(x=id,y=value,color=variable))+
+  geom_line(size=2)+
+  #"gray","darkgreen","firebrick","#9f20f0","#ffa500","#FFFF00","#006680","#00CCFF"
+  scale_color_manual(values=c("darkgreen","firebrick","#ffa500","cyan","gray"), 
+                     labels=c("GCIMP-low","GCIMP-high","Mesenchymal-like","LGm6-GBM","Non-tumor Brain"),
+                     name="Legend") + 
+  #facet_wrap(~ CTCF_id,scales="free_x") +
+  theme(axis.text.x = element_blank(),strip.text = element_text(size=20),axis.text.y = element_text(size=20))
+
+ggplot(c,aes(x=id,y=value,color=variable))+geom_line(size=3)+scale_color_manual(values=c("darkgreen","firebrick","black","black","black","gray","gray")) + facet_wrap(~ CTCF_id,scales="free_x")
+
+
+
+
+
+aux <- lost
+aux$centerCTCF <- floor((aux$end-aux$start)/2 + aux$start)
+aux$start <- aux$centerCTCF - 5000
+aux$end <- aux$centerCTCF + 5000
+a <- findOverlaps(all.pr,makeGRangesFromDataFrame(aux))
+new <- cbind(tudao[queryHits(a),],aux[subjectHits(a),c("id","centerCTCF")])
+new <- merge(new,normalBrain[,c(1,2,9)],by=c("chrom","start"),all.x=TRUE)
+#colnames(new)[12] <- "CTCF_id"
+#obj <- data.frame(id=lost$id,position=floor((lost$end-lost$start)/2 + lost$start))
+#new <- merge(new, aux[,c("id","centerCTCF")], by.x="CTCF_id",by.y="id",all.x=TRUE)
+new$newStart <- new$start-new$centerCTCF
+
+aux2 <- subset(lost, p.valueADJ_lowXhigh_DNAmeth < 0.05 & DiffMean < 0)$id #83 CTCF binding sites e 1044 CpGs
+sub <- subset(new, id %in% aux2)
+
+
+
+c <- melt(sub[,c(4,6,8,12,14)],id=c("id","newStart"))
+
+ggplot(c,aes(x=newStart,y=value,color=variable))  +
+  geom_smooth(na.rm=TRUE) + ylim(0,100)  +
+  scale_x_continuous(breaks=arithSeq(-5000,5000))         +
+  #xlim(-200,200) +
+  scale_color_manual(values=c("darkgreen","firebrick","firebrick","gray","cyan","#ffa500","#ffa500"), 
+                     labels=c("GCIMP-low","GCIMP-high","GCIMP-high","Non-tumor Brain","LGm6-GBM","Mesenchymal-like","Mesenchymal-like"),
+                     name="Legend")
+#+
+ # scale_x_continuous(breaks=arithSeq(-5000,5000))
+
+arithSeq <- function(base, max){
+  i <- base
+  aux <- base
+  while (i < (max)){
+    i <-i + 43.5
+    aux <- c(aux,i)
+  }
+  return(aux)
+}
+
+
+aux <- subset(lost, p.valueADJ_lowXhigh_DNAmeth < 0.05 & DiffMean < 0)$id #83 CTCF binding sites e 1044 CpGs
+c <- subset(b, CTCF_id %in% aux) 
+
+
+#### chromHMM to each CpG
+#chromHMM - http://genome.cshlp.org/content/24/5/761.full Nagarajan et al., 2014
+load("~/GBM WGBS/tudao_todasCpGsInd.rda")
+setwd("/home/thais/chromHMM/samples/")
+a.GR <- makeGRangesFromDataFrame(tudao)
+chromHMM <- tudao[,c("chrom","start","end")]
+for(i in 1:length(list.files())){ 
+  aux <- read.table(list.files()[i],header=TRUE)
+  aux$id <- list.files()[i]
+  aux.GR <- makeGRangesFromDataFrame(aux,
+                                     keep.extra.columns=TRUE,
+                                     ignore.strand=TRUE,
+                                     seqinfo=NULL,
+                                     seqnames.field="Chromosome",
+                                     start.field="start",
+                                     end.field="end",
+                                     starts.in.df.are.0based=FALSE)
+  b <- findOverlaps(a.GR,aux.GR,type="within")
+  if(identical(queryHits(b),seq(1:nrow(tudao)))){
+    chromHMM <- cbind(chromHMM,aux[subjectHits(b),c("type")])
+    colnames(chromHMM)[i+3] <-list.files()[i]
+  }
+  else
+    print("deu ruim") #nao deu ruim 
+  
+}
+str(chromHMM)
+
+chromHMM$enhancer <- apply(chromHMM[,4:12],1,function(i) sum(i %in% c("E3","E4")) > 8)
+rownames(chromHMM) <- NULL
+aux <- rownames(subset(chromHMM, enhancer == TRUE))
+a <- tudao[aux,]
+a$mean_GCIMP.high <- apply(a[,c("percentMeth.1460","percentMeth.1788")],1,mean,na.rm=TRUE)
+a$DiffMean <- a$percentMeth.0128 - a$mean_GCIMP.high
+a <- subset(a, abs(DiffMean) > 50)
+aux <- paste(a$chrom,a$start,sep=".")
+#save(aux,file="/home/thais/chromHMM/Enhancer_probes.rda")
+
+rownames(TCGA.06.0128) <- paste(TCGA.06.0128$chrom,TCGA.06.0128$start,sep=".")
+rownames(TCGA.16.1460) <- paste(TCGA.16.1460$chrom,TCGA.16.1460$start,sep=".")
+rownames(TCGA.19.1788) <- paste(TCGA.19.1788$chrom,TCGA.19.1788$start,sep=".")
+rownames(TCGA.14.1454) <- paste(TCGA.14.1454$chrom,TCGA.14.1454$start,sep=".")
+rownames(TCGA.14.1401) <- paste(TCGA.14.1401$chrom,TCGA.14.1401$start,sep=".")
+rownames(TCGA.14.3477) <- paste(TCGA.14.3477$chrom,TCGA.14.3477$start,sep=".")
+rownames(normalBrain) <- paste(normalBrain$chrom,normalBrain$start,sep=".")
+
+teste <- cbind(TCGA.06.0128[aux,"percentMeth"],TCGA.16.1460[aux,"percentMeth"],TCGA.19.1788[aux,"percentMeth"],TCGA.14.1454[aux,"percentMeth"],TCGA.14.1401[aux,"percentMeth"],TCGA.14.3477[aux,"percentMeth"],normalBrain[aux,c("percentMeth.59","percentMeth.60")])
+colnames(teste) <- c("GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM","Non-tumor Brain","Non-tumor Brain")
+
+#TCGA.06.0128, TCGA.16.1460, TCGA.19.1788, TCGA.14.1454, TCGA.14.1401, TCGA.14.3477, 59, 60
+
+heatmap.plus(as.matrix(teste),
+             Colv=NA,
+             col=jet.colors(75),
+             cexCol = 0.5,
+             labRow = NA,
+             #labCol = NA,
+             scale = "none")
+
+# centering CTCF and FOXM1 peaks
+real.ctcf <- read.table("/home/thais/CTCF_IDHmutGliomas/CTCF_predicted_hg19.bed")
+colnames(real.ctcf) <- c("chrom","start","end","id","score","strand")
+
+load("/home/thais/CTCF_IDHmutGliomas/FromHuy/lost_in_IDHmut_withPvalues.rda")
+colnames(lost) <- c("chrom","start","end","id","number","strand")
+
+gain <- read.table("/home/thais/CTCF_IDHmutGliomas/FromHuy/gained_in_idh1m_pt_2fc_qn_11.bed")
+colnames(gain) <- c("chrom","start","end","id","number","strand")
+
+load("/home/thais/Cloud_SanDiego/TCGA/LGG.GBM/IDHmut_3samples.rda")
+
+
+TCGA.06.0128$start <- as.numeric(as.character(TCGA.06.0128$start))
+TCGA.06.0128$end <- as.numeric(as.character(TCGA.06.0128$end))
+TCGA.06.0128$percentMeth <- as.numeric(as.character(TCGA.06.0128$percentMeth))
+TCGA.06.0128$numCTreads <- as.numeric(as.character(TCGA.06.0128$numCTreads))
+
+TCGA.16.1460$start <- as.numeric(as.character(TCGA.16.1460$start))
+TCGA.16.1460$end <- as.numeric(as.character(TCGA.16.1460$end))
+TCGA.16.1460$percentMeth <- as.numeric(as.character(TCGA.16.1460$percentMeth))
+TCGA.16.1460$numCTreads <- as.numeric(as.character(TCGA.16.1460$numCTreads))
+
+TCGA.19.1788$start <- as.numeric(as.character(TCGA.19.1788$start))
+TCGA.19.1788$end <- as.numeric(as.character(TCGA.19.1788$end))
+TCGA.19.1788$percentMeth <- as.numeric(as.character(TCGA.19.1788$percentMeth))
+TCGA.19.1788$numCTreads <- as.numeric(as.character(TCGA.19.1788$numCTreads))
+
+TCGA.06.0128 <- subset(TCGA.06.0128, numCTreads > 4)
+TCGA.16.1460 <- subset(TCGA.16.1460, numCTreads > 4)
+TCGA.19.1788 <- subset(TCGA.19.1788, numCTreads > 4)
+
+load("/home/thais/GBM WGBS/IDHwt_3samples.rda")
+
+TCGA.14.3477$start <- as.numeric(as.character(TCGA.14.3477$start))
+TCGA.14.3477$end <- as.numeric(as.character(TCGA.14.3477$end))
+TCGA.14.3477$numCTreads <- as.numeric(as.character(TCGA.14.3477$numCTreads))
+
+TCGA.14.1454$start <- as.numeric(as.character(TCGA.14.1454$start))
+TCGA.14.1454$end <- as.numeric(as.character(TCGA.14.1454$end))
+TCGA.14.1454$numCTreads <- as.numeric(as.character(TCGA.14.1454$numCTreads))
+
+TCGA.14.1401$start <- as.numeric(as.character(TCGA.14.1401$start))
+TCGA.14.1401$end <- as.numeric(as.character(TCGA.14.1401$end))
+TCGA.14.1401$numCTreads <- as.numeric(as.character(TCGA.14.1401$numCTreads))
+
+TCGA.14.3477 <- subset(TCGA.14.3477, numCTreads > 4)
+TCGA.14.1454 <- subset(TCGA.14.1454, numCTreads > 4)
+TCGA.14.1401 <- subset(TCGA.14.1401, numCTreads > 4)
+
+load("/home/thais/GBM WGBS/Roadmap_Brain/normalBrain_GSE46644.rda")
+
+aux <- gain
+aux$centerCTCF <- floor((aux$end-aux$start)/2 + aux$start)
+aux$start <- aux$centerCTCF - 1000
+aux$end <- aux$centerCTCF + 1000
+
+a <- findOverlaps(makeGRangesFromDataFrame(normalBrain),makeGRangesFromDataFrame(aux))
+new <- cbind(normalBrain[queryHits(a),],aux[subjectHits(a),c("id","centerCTCF")])
+new$newStart <- new$start-new$centerCTCF
+#order -> TCGA.06.0128, TCGA.16.1460, TCGA.19.1788, TCGA.14.1454, TCGA.14.1401, TCGA.14.3477, 59, 60
+
+#aux2 <- subset(lost, p.valueADJ_lowXhigh_DNAmeth < 0.05 & DiffMean < 0)$id #83 CTCF binding sites e 1044 CpGs
+#sub <- subset(new, id %in% aux2)
+sub <- new
+
+sub$chrom <- factor(sub$chrom)
+teste <- NULL
+i <- 1000
+while(i > -1000){
+  print(i)
+  a <- subset(sub, newStart > i - 40 & newStart < i+1)	
+  if(is.null(teste)){
+    teste <- cbind(i,nrow(a),mean(a[,"percentMeth.60"]))
+  }
+  else{
+    teste <- rbind(teste, cbind(i,nrow(a),mean(a[,"percentMeth.60"])))
+  }
+  i<-i-40
+}
+
+teste <- as.data.frame(teste)
+teste$type <- "Non-tumor brain 2"
+
+
+#all <- teste
+#order -> TCGA.06.0128, TCGA.16.1460, TCGA.19.1788, TCGA.14.1454, TCGA.14.1401, TCGA.14.3477, 59, 60
+all <- rbind(all,teste)
+
+teste <- all[51:150,]
+teste$type <- "GCIMP-high"
+all <- rbind(all,teste)
+
+teste <- all[151:250,]
+teste$type <- "Mesenchymal-like"
+all <- rbind(all,teste)
+
+
+all.a <- melt(all,id=c("i","type","V2"))
+all.a$type <- as.factor(all.a$type)
+
+
+ggplot(all.a,aes(x=i,y=value,color=type))  +
+  geom_smooth(span=0.15,se=FALSE) + ylim(0,100) + 
+  scale_color_manual(values=c("red","darkgreen","cyan","yellow","gray","gray","#ffa500","#ffa500","firebrick","firebrick"), 
+                     #labels=c("GCIMP-low","GCIMP-high","Mesenchymal-like","LGm6-GBM","Non-tumor Brain"),
+                     name="Legend") 
+ggsave("Gain_CTCFs.pdf",width = 10, height = 10)
+
+
+
+library(AnnotationHub)
+library(pbapply)
+ah = AnnotationHub()
+foxm1 <- query(ah , c("FOXM1"))
+histone.marks <-  pblapply(names(foxm1), function(x) {ah[[x]]})
+names(histone.marks) <- names(foxm1)
+
+aux <- histone.marks[[9]]
+aux <- as.data.frame(aux)
+aux$centerTF <- floor((aux$end-aux$start)/2 + aux$start)
+aux$start <- aux$centerTF - 1000
+aux$end <- aux$centerTF + 1000
+
+a <- findOverlaps(makeGRangesFromDataFrame(normalBrain),makeGRangesFromDataFrame(aux))
+new <- cbind(normalBrain[queryHits(a),],centerTF=aux[subjectHits(a),c("centerTF")])
+new$newStart <- new$start-new$centerTF
+#order -> TCGA.06.0128, TCGA.16.1460, TCGA.19.1788, TCGA.14.1454, TCGA.14.1401, TCGA.14.3477, 59, 60
+
+#aux2 <- subset(lost, p.valueADJ_lowXhigh_DNAmeth < 0.05 & DiffMean < 0)$id #83 CTCF binding sites e 1044 CpGs
+#sub <- subset(new, id %in% aux2)
+sub <- new
+
+sub$chrom <- factor(sub$chrom)
+teste <- NULL
+i <- 1000
+while(i > -1000){
+  print(i)
+  a <- subset(sub, newStart > i - 40 & newStart < i+1)	
+  if(is.null(teste)){
+    teste <- cbind(i,nrow(a),mean(a[,"percentMeth.60"]))
+  }
+  else{
+    teste <- rbind(teste, cbind(i,nrow(a),mean(a[,"percentMeth.60"])))
+  }
+  i<-i-40
+}
+
+teste <- as.data.frame(teste)
+teste$type <- "Non-tumor Brain 2"
+
+
+#all <- teste
+#order -> TCGA.06.0128, TCGA.16.1460, TCGA.19.1788, TCGA.14.1454, TCGA.14.1401, TCGA.14.3477, 59, 60
+all <- rbind(all,teste)
+
+teste <- all[51:150,]
+teste$type <- "GCIMP-high"
+all <- rbind(all,teste)
+
+teste <- all[151:250,]
+teste$type <- "Mesenchymal-like"
+all <- rbind(all,teste)
+
+#all[51:100,"type"] <- "TCGA.16.1460"
+#all[101:150,"type"] <- "TCGA.19.1788"
+#all[151:200,"type"] <- "TCGA.14.1454"
+#all[201:250,"type"] <- "TCGA.14.1401"
+
+all.a <- melt(all,id=c("i","type","V2"))
+all.a$type <- as.factor(all.a$type)
+
+
+ggplot(all.a,aes(x=i,y=value,color=type))  +
+  geom_smooth(span=0.15,se=FALSE) + ylim(0,100) + 
+  scale_color_manual(values=c("red","darkgreen","cyan","yellow","gray","gray","#ffa500","#ffa500","firebrick","firebrick"), 
+                     #labels=c("GCIMP-low","GCIMP-high","Mesenchymal-like","LGm6-GBM","Non-tumor Brain"),
+                     name="Legend") 
+ggsave("FOXM1_dataset9.pdf",width = 10, height = 10)
+
+## Potential FOXM1 target genes based on ChIP-seq data
+library(AnnotationHub)
+library(pbapply)
+ah = AnnotationHub()
+foxm1 <- query(ah , c("FOXM1"))
+histone.marks <-  pblapply(names(foxm1), function(x) {ah[[x]]})
+names(histone.marks) <- names(foxm1)
+
+genes_hg19 <- read.table("/home/thais/Dropbox/Galaxy1-[Homo_sapiens_genes_(GRCh37.p13)].tabular",header=TRUE,sep="\t")
+genes_hg19 <- genes_hg19[genes_hg19$Chromosome.Name %in% c(1:22,"X","Y"),]
+genes_hg19 <- genes_hg19[!is.na(genes_hg19$EntrezGene.ID),]
+genes_hg19 <- genes_hg19[!duplicated(genes_hg19$EntrezGene.ID),] #the duplicates are different transcripts, not different coordinates
+rownames(genes_hg19) <- NULL
+gene.GR <- GRanges(seqnames = paste0("chr",genes_hg19$Chromosome.Name),ranges = IRanges(start = genes_hg19$Gene.Start..bp., end=genes_hg19$Gene.End..bp.), strand = genes_hg19$Strand, symbol = genes_hg19$Associated.Gene.Name, EntrezID = genes_hg19$EntrezGene.ID)
+
+
+aux <- histone.marks[[4]]
+
+a <- distanceToNearest(aux, gene.GR)
+a <- as.data.frame(a)
+a <- subset(a, distance < 2000)
+aux <- as.data.frame(aux)
+symbol <- genes_hg19[unique(a$subjectHits),"Associated.Gene.Name"]
+symbol <- as.character(symbol)
+
+
+normal.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,1:5]
+normal.mrna <- normal.mrna+1
+normal.mrna <- log2(normal.mrna)
+normal.mrna <- apply(normal.mrna,1,mean,na.rm=TRUE)
+normal.mrna <- as.data.frame(normal.mrna)
+colnames(normal.mrna) <- "value"
+normal.mrna$type <- "Non-tumor Brain"
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+low.mrna <- low.mrna+1
+low.mrna <- log2(low.mrna)
+low.mrna <- apply(low.mrna,1,mean,na.rm=TRUE)
+low.mrna <- as.data.frame(low.mrna)
+colnames(low.mrna) <- "value"
+low.mrna$type <- "GCIMP-low"
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+high.mrna <- high.mrna+1
+high.mrna <- log2(high.mrna)
+high.mrna <- apply(high.mrna,1,mean,na.rm=TRUE)
+high.mrna <- as.data.frame(high.mrna)
+colnames(high.mrna) <- "value"
+high.mrna$type <- "GCIMP-high"
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("IDHmut-codel"))$case.id)
+codel.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+codel.mrna <- codel.mrna+1
+codel.mrna <- log2(codel.mrna)
+codel.mrna <- apply(codel.mrna,1,mean,na.rm=TRUE)
+codel.mrna <- as.data.frame(codel.mrna)
+colnames(codel.mrna) <- "value"
+codel.mrna$type <- "IDHmut-codel"
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Classic-like"))$case.id)
+classic.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+classic.mrna <- classic.mrna+1
+classic.mrna <- log2(classic.mrna)
+classic.mrna <- apply(classic.mrna,1,mean,na.rm=TRUE)
+classic.mrna <- as.data.frame(classic.mrna)
+colnames(classic.mrna) <- "value"
+classic.mrna$type <- "Classic-like"
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Mesenchymal-like"))$case.id)
+mes.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+mes.mrna <- mes.mrna+1
+mes.mrna <- log2(mes.mrna)
+mes.mrna <- apply(mes.mrna,1,mean,na.rm=TRUE)
+mes.mrna <- as.data.frame(mes.mrna)
+colnames(mes.mrna) <- "value"
+mes.mrna$type <- "Mesenchymal-like"
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-GBM"))$case.id)
+lgm6.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+lgm6.mrna <- lgm6.mrna+1
+lgm6.mrna <- log2(lgm6.mrna)
+lgm6.mrna <- apply(lgm6.mrna,1,mean,na.rm=TRUE)
+lgm6.mrna <- as.data.frame(lgm6.mrna)
+colnames(lgm6.mrna) <- "value"
+lgm6.mrna$type <- "LGm6-GBM"
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-LGG"))$case.id)
+pa.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+pa.mrna <- pa.mrna+1
+pa.mrna <- log2(pa.mrna)
+pa.mrna <- apply(pa.mrna,1,mean,na.rm=TRUE)
+pa.mrna <- as.data.frame(pa.mrna)
+colnames(pa.mrna) <- "value"
+pa.mrna$type <- "PA-like"
+
+aux <- rbind(normal.mrna,low.mrna,high.mrna,codel.mrna,classic.mrna,mes.mrna,lgm6.mrna,pa.mrna)
+aux$type <- as.factor(aux$type)
+aux$type <- factor(aux$type, levels = c("Non-tumor Brain","GCIMP-low","GCIMP-high","IDHmut-codel","Classic-like","Mesenchymal-like","LGm6-GBM","PA-like"))
+ggplot(aux, aes(type, value,fill = type)) + 
+  geom_boxplot(outlier.shape=NA)  + 
+  # geom_jitter() +
+  ylab("RNAseq values (log2 transformed") + 
+  xlab("Glioma subtypes") + 
+  theme(axis.text.x = element_blank(),strip.text = element_text(size=15),axis.text.y = element_text(size=10),legend.text=element_text(size=10),legend.title=element_text(size=10)) + 
+  scale_fill_manual(values = c("gray","darkgreen","firebrick","#9f20f0","#ffa500","#FFFF00","#006680","#00CCFF"),name="Glioma subtypes")
+ggsave("FOXM1_dataset4_targets9112.png",width = 10, height = 10)
+
+### Centering the CTCF - Heatmap
+
+real.ctcf <- read.table("/home/thais/CTCF_IDHmutGliomas/CTCF_predicted_hg19.bed")
+colnames(real.ctcf) <- c("chrom","start","end","name","score","strand")
+real.ctcf$id <- seq(1:nrow(real.ctcf))
+
+aux <- real.ctcf
+aux$centerCTCF <- floor((aux$end-aux$start)/2 + aux$start)
+aux$start <- aux$centerCTCF - 1000
+aux$end <- aux$centerCTCF + 1000
+
+a <- findOverlaps(makeGRangesFromDataFrame(tudao),makeGRangesFromDataFrame(aux))
+sub <- cbind(tudao[queryHits(a),],aux[subjectHits(a),c("id","centerCTCF")])
+sub$newStart <- sub$start-sub$centerCTCF
+#order -> TCGA.06.0128, TCGA.16.1460, TCGA.19.1788, TCGA.14.1454, TCGA.14.1401, TCGA.14.3477, 59, 60
+
+#aux2 <- subset(lost, p.valueADJ_lowXhigh_DNAmeth < 0.05 & DiffMean < 0)$id #83 CTCF binding sites e 1044 CpGs
+#sub <- subset(new, id %in% aux2)
+
+sub$id <- as.factor(sub$id)
+teste1 <- NULL
+#for(j in 1:nlevels(sub$id)){
+for(j in 1:3000){
+#for(j in 1:2){
+	  print(j)
+	aux <- sub[sub$id %in% levels(sub$id)[j],c("centerCTCF","percentMeth.0128","newStart","id")]
+	aux <- na.omit(aux)
+	i <- 1000
+	while(i > -1000){
+		a <- subset(aux, newStart > i - 20 & newStart < i+1)	
+		if(nrow(a) < 1)
+			a <- cbind(i,nrow(a),NA,levels(sub$id)[j])
+		else
+			a <- cbind(i,nrow(a),mean(a[,"percentMeth.0128"],na.rm=TRUE),levels(sub$id)[j])
+		if(is.null(teste1)){
+			teste1 <- a
+  		}
+		else{
+			teste1 <- rbind(teste1,a)
+  		}
+  	i<-i-20
+	}
+}
+
+b <- teste1
+teste1 <- as.data.frame(teste1)
+colnames(teste1) <- c("seq","nCpGs","meth","CTCF")
+teste1$group <- NA
+teste1$meth <- as.numeric(as.character(teste1$meth))
+summary(teste1) 
+#teste1$seq <- as.numeric(as.character(teste1$seq))
+#aux <- teste1[teste1$seq < 161 & teste1$seq > -159,]
+#aux
+
+summary(as.numeric(as.character(teste1$seq)))
+
+
+teste1$seq <- factor(teste1$seq, levels=arithSeq(-980,1000))
+teste1[teste1$meth <= 50 & !is.na(teste1$meth),"group"] <- "Unmethylated"
+teste1[teste1$meth > 50 & !is.na(teste1$meth),"group"] <- "Methylated"
+teste1[is.na(teste1$meth),"group"] <- "No.CpG"
+
+library(reshape2)
+aux <- dcast(teste1, CTCF ~ seq, value.var = "meth")
+aux <- aux[,43:59]
+head(aux)
+norm2 <- apply(aux,1,mean,na.rm=TRUE)
+save(norm2,file="media_norm2.rda")
+
+
+library(ggplot2)
+load("/home/thais/ordem_normal.rda")
+teste1$CTCF <- factor(teste1$CTCF, levels=ordem1)
+ggplot(teste1, aes(x=seq,y=factor(CTCF))) + 
+  geom_tile(aes(fill=factor(group)))+
+  scale_fill_manual(values=c("firebrick","black","cyan")) +
+theme_bw() + theme(panel.grid.major = element_line(colour = "white"), panel.grid.minor = element_line(colour = "white"),axis.text.x = element_text(angle = 45, hjust = 1),axis.text.y = element_blank(),panel.margin = unit(0, "lines"))
+
+ggsave("CTCFs_norm22.png",width = 10, height = 10)
+
+dist <- NULL
+for(i in 1:(nrow(TCGA.06.0128))){
+	dist <- c(dist,(TCGA.06.0128$start[i+1]-TCGA.06.0128$start[i]))
+
+}
+
+#### Wilcoxon-test between low and high - Real CTCFs
+real.ctcf <- read.table("/home/thais/CTCF_IDHmutGliomas/CTCF_predicted_hg19.bed")
+colnames(real.ctcf) <- c("chrom","start","end","id","score","strand")
+real.ctcf$id <- 1:nrow(real.ctcf)
+
+real.ctcf$centerCTCF <- floor((real.ctcf$end-real.ctcf$start)/2 + real.ctcf$start)
+real.ctcf$start <- real.ctcf$centerCTCF - 200
+real.ctcf$end <- real.ctcf$centerCTCF + 200
+
+a <- findOverlaps(makeGRangesFromDataFrame(tudao),makeGRangesFromDataFrame(real.ctcf))
+new <- cbind(tudao[queryHits(a),],real.ctcf[subjectHits(a),c("id","centerCTCF")])
+new$newStart <- new$start-new$centerCTCF
+
+new$mean_GCIMP.high <- apply(new[,c("percentMeth.1460","percentMeth.1788")],1,mean,na.rm=TRUE)
+real.ctcf$DiffMean_lowXhigh <- NA
+real.ctcf$p.value_lowXhigh_DNAmeth <- NA
+for(i in 1:nlevels(as.factor(new$id))){
+#for(i in 1:10){
+  aux <- subset(new, id %in% levels(as.factor(new$id))[i])
+  a <- mean(aux$percentMeth.0128,na.rm=TRUE) - mean(aux$mean_GCIMP.high,na.rm=TRUE)
+  if(nrow(aux) > 1 & sum(is.na(aux$percentMeth.0128)) < nrow(aux) & sum(is.na(aux$mean_GCIMP.high)) < nrow(aux)){ 
+    aux <- melt(aux[,c("percentMeth.0128","percentMeth.1460","percentMeth.1788")])
+    levels(aux$variable) <- c("low","high","high")
+    real.ctcf[real.ctcf$id %in% levels(as.factor(new$id))[i],"p.value_lowXhigh_DNAmeth"] <- pvalue(wilcox_test(value ~ variable,aux))
+    real.ctcf[real.ctcf$id %in% levels(as.factor(new$id))[i],"DiffMean_lowXhigh"] <- a
+  }
+  
+}
+real.ctcf$p.valueADJ_lowXhigh_DNAmeth <- p.adjust(real.ctcf$p.value_lowXhigh_DNAmeth,"fdr")
+
+#### Wilcoxon-test between high and normal brain - Real CTCFs
+new$mean_normalBrain <- apply(new[,c("percentMeth.59","percentMeth.60")],1,mean,na.rm=TRUE)
+real.ctcf$DiffMean_highXnormal <- NA
+real.ctcf$p.value_highXnormal_DNAmeth <- NA
+for(i in 1:nlevels(as.factor(new$id))){
+#for(i in 1:10){
+  aux <- subset(new, id %in% levels(as.factor(new$id))[i])
+  a <- mean(aux$mean_GCIMP.high,na.rm=TRUE) - mean(aux$mean_normalBrain,na.rm=TRUE)
+  if(nrow(aux) > 1 & sum(is.na(aux$mean_GCIMP.high)) < nrow(aux) & sum(is.na(aux$mean_normalBrain)) < nrow(aux)){ 
+    aux <- melt(aux[,c("percentMeth.1460","percentMeth.1788","percentMeth.59","percentMeth.60")])
+    levels(aux$variable) <- c("high","high","normal","normal")
+    real.ctcf[real.ctcf$id %in% levels(as.factor(new$id))[i],"p.value_highXnormal_DNAmeth"] <- pvalue(wilcox_test(value ~ variable,aux))
+    real.ctcf[real.ctcf$id %in% levels(as.factor(new$id))[i],"DiffMean_highXnormal"] <- a
+  }
+}
+real.ctcf$p.valueADJ_highXnormal_DNAmeth <- p.adjust(real.ctcf$p.value_highXnormal_DNAmeth,"fdr")
+
+#Add the mean methylation of non-tumor brain at each real CTCF
+real.ctcf$meanNormalBrain <- NA
+for(i in 1:nlevels(as.factor(new$id))){
+  #for(i in 1:10){
+  aux <- subset(new, id %in% levels(as.factor(new$id))[i])
+  a <- mean(aux$mean_normalBrain,na.rm=TRUE)
+  if(nrow(aux) > 1 & sum(is.na(aux$mean_normalBrain)) < nrow(aux)){ 
+    real.ctcf[real.ctcf$id %in% levels(as.factor(new$id))[i],"meanNormalBrain"] <- a
+  }
+  
+}
+
+# heatmap of these diff meth CTCFs
+a <- subset(real.ctcf, p.valueADJ_lowXhigh_DNAmeth < 0.05 & p.valueADJ_highXnormal_DNAmeth > 0.05 & DiffMean_lowXhigh < -30 & abs(DiffMean_highXnormal) < 30)
+aux <- a
+aux$start <- aux$centerCTCF - 1000
+aux$end <- aux$centerCTCF + 1000
+
+a <- findOverlaps(makeGRangesFromDataFrame(tudao),makeGRangesFromDataFrame(aux))
+sub <- cbind(tudao[queryHits(a),],aux[subjectHits(a),c("id","centerCTCF")])
+sub$newStart <- sub$start-sub$centerCTCF
+#order -> TCGA.06.0128, TCGA.16.1460, TCGA.19.1788, TCGA.14.1454, TCGA.14.1401, TCGA.14.3477, 59, 60
+
+#aux2 <- subset(lost, p.valueADJ_lowXhigh_DNAmeth < 0.05 & DiffMean < 0)$id #83 CTCF binding sites e 1044 CpGs
+#sub <- subset(new, id %in% aux2)
+
+sub$mean_normalBrain <- apply(sub[,c("percentMeth.59","percentMeth.60")],1,mean,na.rm=TRUE)
+sub$id <- as.factor(sub$id)
+teste1 <- NULL
+#for(j in 1:nlevels(sub$id)){
+for(j in 1:nlevels(sub$id)){
+#for(j in 1:2){
+	  print(j)
+	aux <- sub[sub$id %in% levels(sub$id)[j],c("centerCTCF","mean_normalBrain","newStart","id")]
+	aux <- na.omit(aux)
+	i <- 1000
+	while(i > -1000){
+		a <- subset(aux, newStart > i - 20 & newStart < i+1)	
+		if(nrow(a) < 1)
+			a <- cbind(i,nrow(a),NA,levels(sub$id)[j])
+		else
+			a <- cbind(i,nrow(a),mean(a[,"mean_normalBrain"],na.rm=TRUE),levels(sub$id)[j])
+		if(is.null(teste1)){
+			teste1 <- a
+  		}
+		else{
+			teste1 <- rbind(teste1,a)
+  		}
+  	i<-i-20
+	}
+}
+
+b <- teste1
+teste1 <- as.data.frame(teste1)
+colnames(teste1) <- c("seq","nCpGs","meth","CTCF")
+teste1$group <- NA
+teste1$meth <- as.numeric(as.character(teste1$meth))
+summary(teste1) 
+#teste1$seq <- as.numeric(as.character(teste1$seq))
+#aux <- teste1[teste1$seq < 161 & teste1$seq > -159,]
+#aux
+
+summary(as.numeric(as.character(teste1$seq)))
+
+
+teste1$seq <- factor(teste1$seq, levels=arithSeq(-980,1000))
+teste1[teste1$meth <= 30 & !is.na(teste1$meth),"group"] <- "Unmethylated"
+teste1[teste1$meth > 30 & !is.na(teste1$meth),"group"] <- "Methylated"
+teste1[is.na(teste1$meth),"group"] <- "No.CpG"
+
+teste1$CTCF <- factor(teste1$CTCF, levels=order.ctcf)
+ggplot(teste1, aes(x=seq,y=factor(CTCF))) + 
+  geom_tile(aes(fill=factor(group)))+
+  scale_fill_manual(values=c("red","black","cyan")) +
+theme_bw() + theme(panel.grid.major = element_line(colour = "white"), panel.grid.minor = element_line(colour = "white"),axis.text.x = element_text(angle = 45, hjust = 1),panel.margin = unit(0, "lines"))
+
+
+ggsave("/home/thais/CTCF_IDHmutGliomas/Diff_CTCFs_normal60.png",width = 10, height = 10)
+
+library(reshape2)
+aux <- dcast(teste1, CTCF ~ seq, value.var = "meth")
+aux <- aux[,43:59]
+head(aux)
+norm2 <- apply(aux,1,mean,na.rm=TRUE)
+order.ctcf <- hclust(dist(norm2))$order
+aux <- dcast(teste1, CTCF ~ seq, value.var = "meth")
+order.ctcf <- as.character(aux[order.ctcf,"CTCF"])
+
+arithSeq <- function(base, max){
+  i <- base
+  aux <- base
+  while (i < (max)){
+    i <-i + 20
+    aux <- c(aux,i)
+  }
+  return(aux)
+}
+
+#geom smooth of these CTCFs
+a <- subset(real.ctcf, p.valueADJ_lowXhigh_DNAmeth < 0.05 & p.valueADJ_highXnormal_DNAmeth > 0.05 & DiffMean_lowXhigh < -30 & abs(DiffMean_highXnormal) < 30)
+new <- subset(sub, id %in% as.character(a$id))
+
+c <- melt(sub[,c(4:11, 21,23)],id=c("id","newStart"))
+
+ggplot(c,aes(x=newStart,y=value,color=variable))  +
+  geom_smooth(na.rm=TRUE) + ylim(0,100)  +
+  scale_x_continuous(breaks=arithSeq(-1000,1000))         +
+  #xlim(-200,200) +
+  scale_color_manual(values=c("darkgreen","firebrick","firebrick","#ffa500","#ffa500","cyan","gray","gray"), 
+                     labels=c("GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM","Non-tumor Brain","Non-tumor Brain"),
+                     name="Legend")
+ggsave("/home/thais/CTCF_IDHmutGliomas/Diff_CTCFs_30cutoff_less30.pdf",width = 10, height = 10)
+
+#Get the genes near these diff CTCFs and plot a volcano of them
+load("/home/thais/GBM WGBS/teste_lowXhigh_rnaseq_Newnorm.rda")
+load("/home/thais/NormalBrain_TCGA/RNAseq/LGG_GBM_nonTumorBrain_RNAseqNorm.rda")
+tsg <- read.delim("/home/thais/GBM WGBS/Human_TSGs.txt")
+
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(org.Hs.eg.db)
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+genes <- genes(txdb_hg19)
+symbols <- unlist(mapIds(org.Hs.eg.db, genes$gene_id, "SYMBOL", "ENTREZID", multiVals = "first"))
+genes <- as.data.frame(genes)
+genes$symbol <- as.matrix(symbols)
+
+gene.GR <- makeGRangesFromDataFrame(genes,TRUE)
+
+a <- subset(real.ctcf, p.valueADJ_lowXhigh_DNAmeth < 0.05 & p.valueADJ_highXnormal_DNAmeth > 0.05 & DiffMean_lowXhigh < -30 & abs(DiffMean_highXnormal) < 30)
+
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start-1000000, end=a$start))
+aux2.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$end, end=a$end+1000000))
+aux.GR <- c(aux.GR,aux2.GR)
+gene_id <- as.data.frame(subsetByOverlaps(gene.GR,aux.GR))$gene_id
+
+lowXhigh_RNAseq <- cbind(log2(rna.seq.LGG.GBM.normalBrain[,1:5]+1),lowXhigh_RNAseq)
+lowXhigh_RNAseq$entrezID <- as.character(rna.seq.LGG.GBM.normalBrain$entrezID)
+volcano <- lowXhigh_RNAseq
+volcano$nearCTCF <- 1
+volcano[as.character(volcano$entrezID) %in% as.character(gene_id),"nearCTCF"] <- 2
+
+
+   
+volcano$threshold <- "1"
+a <- subset(volcano, p.value.adj > 0.05 & nearCTCF == 2)
+volcano[rownames(a),"threshold"] <- "6"
+a <- subset(volcano, p.value.adj < 0.05)
+b <- subset(a, DiffMean < 0 ) #hyper no da direita
+volcano[rownames(b),"threshold"] <- "2"
+b <- subset(a, DiffMean < 0 & nearCTCF == 2) #hyper no da direita
+volcano[rownames(b),"threshold"] <- "4"
+b <- subset(a, DiffMean > 0) #hyper no da esquerda
+volcano[rownames(b),"threshold"] <- "3"
+b <- subset(a, DiffMean > 0 & nearCTCF == 2) #hyper no da direita
+volcano[rownames(b),"threshold"] <- "5"
+volcano$symbol <- rownames(volcano)
+
+#Known tumor supressor genes
+b <- (subset(volcano,threshold %in% c("2","3","4","5") & volcano$Brain_OG == TRUE)$entrezID)
+b <- genes[genes$gene_id %in% b,]
+b <- b[with(b,order(seqnames)),]
+b <- makeGRangesFromDataFrame(b,TRUE)
+
+#a <- subset(real.ctcf, p.valueADJ_lowXhigh_DNAmeth < 0.05 & p.valueADJ_highXnormal_DNAmeth > 0.05 & DiffMean_lowXhigh < -30 & abs(DiffMean_highXnormal) < 30)
+a <- real.ctcf
+
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start-1000000, end=a$start),id=a$id)
+aux2.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$end, end=a$end+1000000),id=a$id)
+aux.GR <- c(aux.GR,aux2.GR)
+aux <- nearest(b,aux.GR)
+b <- as.data.frame(b)
+b$CTCF <- as.data.frame(aux.GR[aux,])$id
+
+volcano$CTCF <- 1
+volcano[as.character(b$symbol),"CTCF"] <- b$CTCF
+#End 'known tumor supressor genes'
+
+#Brain tumor supressor genes
+volcano$meanNormalBrain <- apply(volcano[,1:5],1,mean,na.rm=TRUE)
+volcano$Brain_OG <- apply(volcano[,1:5],1,function(volcano){
+                                            a <- sum(volcano == 0) == 5
+                                            return(a)
+                                           })
+#volcano$Brain_OG <- volcano$Brain_OG == TRUE & volcano$meanM1 > 2 & volcano$meanM2 > 2
+
+volcano$Brain_OG <- volcano$Brain_OG == TRUE & volcano$p.value.adj < 0.05 & !is.na(volcano$p.value.adj) & abs(volcano$DiffMean) > 2
+
+volcano$Brain_TSG <- apply(volcano[,1:5],1,function(volcano){
+                                            a <- sum(volcano > 1) == 5
+                                            return(a)
+                                            })
+volcano$Brain_TSG <- volcano$Brain_TSG == TRUE & (volcano$meanM1 == 0 | volcano$meanM2 == 0)
+
+volcano$Brain_TSG <- volcano$Brain_TSG == TRUE & volcano$p.value.adj < 0.05 & !is.na(volcano$p.value.adj) & (volcano$meanM1 == 0 | volcano$meanM2 == 0)
+
+ggplot(data=volcano,aes(x=DiffMean, y=-1*log10(p.value.adj))) +
+	geom_point(data=subset(volcano,threshold %in% c("1","2","3")),aes(x=DiffMean, y=-1*log10(p.value.adj), colour=threshold),size=1) +
+	geom_point(data=subset(volcano,threshold %in% c("4","5","6")),aes(x=DiffMean, y=-1*log10(p.value.adj), colour=threshold),size=2) +
+      xlab("Gene expression (fold-change)") + ylab("-1 * log10 of the Significance") +
+      labs(title = "Volcano Plot") +
+      scale_color_manual(breaks=c("1","2","3","4","5","6"), # color scale (for points)
+                         values=c("grey", "green", "red","darkgreen","firebrick","gray47"),
+                         labels=c("Not Significant","Downregulated in GCIMP-low","Upregulated in GCIMP-low","Downregulated in GCIMP-low (near CTCF)","Upregulated in GCIMP-low (near CTCF)","Not Significant (near CTCF)"),name="Legend")  + 
+	#geom_label_repel(data=subset(volcano,threshold %in% c("4","5") & rownames(volcano) %in% as.character(tsg$GeneSymbol)),aes(label=symbol,fill=factor(CTCF)),size = 5,box.padding = unit(1, "lines"),point.padding = unit(1, "lines"))
+  geom_label_repel(data=subset(volcano,threshold %in% c("5") & volcano$Brain_OG == TRUE),aes(label=symbol,fill=factor(CTCF)),size = 5,box.padding = unit(1, "lines"),point.padding = unit(1, "lines"))
+
+ggplot(data=volcano,aes(x=DiffMean, y=-1*log10(p.value.adj))) +
+  geom_point(data=subset(volcano,threshold %in% c("1","2","3")),aes(x=DiffMean, y=-1*log10(p.value.adj), colour=threshold),size=1) +
+  geom_point(data=subset(volcano,threshold %in% c("4","5","6")),aes(x=DiffMean, y=-1*log10(p.value.adj), colour=threshold),size=2) +
+  xlab("Gene expression (fold-change)") + ylab("-1 * log10 of the Significance") +
+  labs(title = "Volcano Plot") +
+  scale_color_manual(breaks=c("1","2","3","4","5","6"), # color scale (for points)
+                     values=c("grey", "green", "red","darkgreen","firebrick","gray47"),
+                     labels=c("Not Significant","Downregulated in GCIMP-low","Upregulated in GCIMP-low","Downregulated in GCIMP-low (near CTCF)","Upregulated in GCIMP-low (near CTCF)","Not Significant (near CTCF)"),name="Legend")  + 
+  #geom_label_repel(data=subset(volcano,threshold %in% c("4","5") & rownames(volcano) %in% as.character(tsg$GeneSymbol)),aes(label=symbol,fill=factor(CTCF)),size = 5,box.padding = unit(1, "lines"),point.padding = unit(1, "lines"))
+  geom_label_repel(data=subset(volcano,threshold %in% c("2","4") & volcano$Brain_TSG == TRUE),aes(label=symbol,fill=factor(CTCF)),size = 5,box.padding = unit(1, "lines"),point.padding = unit(1, "lines"))
+
+#ggsave("/home/thais/CTCF_IDHmutGliomas/volcano_allGenes.png",width = 15, height = 10)
+
+#Brain tumor supressor genes or oncogenes
+#b <- subset(volcano,threshold %in% c("2","3","4","5") & Brain_OG == TRUE)
+b <- subset(volcano, Brain_TSG == TRUE)
+#symbol <- rownames(b)[65:106] #Oncogene -> 1:29, 30:64, 65:106
+symbol <- rownames(b) #Oncogene -> 1:29, 30:64, 65:106
+normal.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,1:5]
+normal.mrna <- normal.mrna+1
+normal.mrna <- log2(normal.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+low.mrna <- low.mrna+1
+low.mrna <- log2(low.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+high.mrna <- high.mrna+1
+high.mrna <- log2(high.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("IDHmut-codel"))$case.id)
+codel.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+codel.mrna <- codel.mrna+1
+codel.mrna <- log2(codel.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Classic-like"))$case.id)
+classic.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+classic.mrna <- classic.mrna+1
+classic.mrna <- log2(classic.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Mesenchymal-like"))$case.id)
+mes.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+mes.mrna <- mes.mrna+1
+mes.mrna <- log2(mes.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-GBM"))$case.id)
+lgm6.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+lgm6.mrna <- lgm6.mrna+1
+lgm6.mrna <- log2(lgm6.mrna)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-LGG"))$case.id)
+pa.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+pa.mrna <- pa.mrna+1
+pa.mrna <- log2(pa.mrna)
+
+normal.mrna$symbol <- rownames(normal.mrna)
+normal.m <- melt(normal.mrna,id="symbol")
+low.mrna$symbol <- rownames(low.mrna)
+low.m <- melt(low.mrna,id="symbol")
+high.mrna$symbol <- rownames(high.mrna)
+high.m <- melt(high.mrna,id="symbol")
+codel.mrna$symbol <- rownames(codel.mrna)
+codel.m <- melt(codel.mrna,id="symbol")
+classic.mrna$symbol <- rownames(classic.mrna)
+classic.m <- melt(classic.mrna,id="symbol")
+mes.mrna$symbol <- rownames(mes.mrna)
+mes.m <- melt(mes.mrna,id="symbol")
+lgm6.mrna$symbol <- rownames(lgm6.mrna)
+lgm6.m <- melt(lgm6.mrna,id="symbol")
+pa.mrna$symbol <- rownames(pa.mrna)
+pa.m <- melt(pa.mrna,id="symbol")
+
+normal.m$Subtype <- "Non-tumor Brain"
+low.m$Subtype <- "GCIMP-low"
+high.m$Subtype <- "GCIMP-high"
+codel.m$Subtype <- "IDHmut-codel"
+classic.m$Subtype <- "Classic-like"
+mes.m$Subtype <- "Mesenchymal-like"
+lgm6.m$Subtype <- "LGm6-GBM"
+pa.m$Subtype <- "PA-like"
+all <- Reduce(rbind,list(normal.m,low.m,high.m,codel.m,classic.m, mes.m, lgm6.m,pa.m))
+all$Subtype <- as.factor(all$Subtype)
+all$Subtype <- factor(all$Subtype, levels = c("Non-tumor Brain","GCIMP-low","GCIMP-high","IDHmut-codel","Classic-like","Mesenchymal-like","LGm6-GBM","PA-like"))
+
+#plot gene expression
+ggplot(all, aes(Subtype, value,fill = Subtype)) + 
+  geom_boxplot(outlier.shape=NA)  + 
+  geom_jitter() +
+  facet_wrap( ~ symbol,scales="free") +
+  theme(axis.text.x = element_blank(),strip.text = element_text(size=25),axis.text.y = element_text(size=20),legend.text=element_text(size=25),legend.title=element_text(size=25),legend.key.size=unit(2,"cm")) +
+  scale_fill_manual(values = c("gray","darkgreen","firebrick","#9f20f0","#ffa500","#FFFF00","#006680","#00CCFF"))  #salvar 15 por 10 em pdf ou 2500 por 1500 em png
+ggsave("/home/thais/GBM WGBS/Brain_OG_3.png",width = 20, height = 10)
+
+#Heatmap Tumor supressor genes and oncogenes
+b <- subset(volcano,threshold %in% c("2","3","4","5") & Brain_OG == TRUE)
+symbol <- rownames(b)
+normal.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,1:5]
+normal.mrna <- normal.mrna+1
+normal.mrna <- log2(normal.mrna)
+normal.mrna <- apply(normal.mrna,1,mean,na.rm=TRUE)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-low"))$case.id)
+low.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+low.mrna <- low.mrna+1
+low.mrna <- log2(low.mrna)
+low.mrna <- apply(low.mrna,1,mean,na.rm=TRUE)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("G-CIMP-high"))$case.id)
+high.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+high.mrna <- high.mrna+1
+high.mrna <- log2(high.mrna)
+high.mrna <- apply(high.mrna,1,mean,na.rm=TRUE)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("IDHmut-codel"))$case.id)
+codel.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+codel.mrna <- codel.mrna+1
+codel.mrna <- log2(codel.mrna)
+codel.mrna <- apply(codel.mrna,1,mean,na.rm=TRUE)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Classic-like"))$case.id)
+classic.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+classic.mrna <- classic.mrna+1
+classic.mrna <- log2(classic.mrna)
+classic.mrna <- apply(classic.mrna,1,mean,na.rm=TRUE)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("Mesenchymal-like"))$case.id)
+mes.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+mes.mrna <- mes.mrna+1
+mes.mrna <- log2(mes.mrna)
+mes.mrna <- apply(mes.mrna,1,mean,na.rm=TRUE)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-GBM"))$case.id)
+lgm6.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+lgm6.mrna <- lgm6.mrna+1
+lgm6.mrna <- log2(lgm6.mrna)
+lgm6.mrna <- apply(lgm6.mrna,1,mean,na.rm=TRUE)
+aux <- as.character(subset(pd, clustM.supervised2 %in% c("PA-like-LGG"))$case.id)
+pa.mrna <- rna.seq.LGG.GBM.normalBrain[rownames(rna.seq.LGG.GBM.normalBrain) %in% symbol,colnames(rna.seq.LGG.GBM.normalBrain) %in% aux]
+pa.mrna <- pa.mrna+1
+pa.mrna <- log2(pa.mrna)
+pa.mrna <- apply(pa.mrna,1,mean,na.rm=TRUE)
+
+
+all <- cbind(normal.mrna,low.mrna,high.mrna,codel.mrna,classic.mrna,mes.mrna,lgm6.mrna,pa.mrna)
+all <- cbind(normal.mrna,low.mrna,high.mrna)
+#clab <- cbind(c("gray","darkgreen","firebrick","#9f20f0","#ffa500","#FFFF00","#006680","#00CCFF"),c("gray","darkgreen","firebrick","#9f20f0","#ffa500","#FFFF00","#006680","#00CCFF"))
+
+
+#clab <- cbind(c(rep("gray",ncol(normal.mrna)),rep("darkgreen",ncol(low.mrna)),rep("firebrick",ncol(high.mrna)),rep("#9f20f0",ncol(codel.mrna)),rep("#ffa500",ncol(classic.mrna)),rep("#FFFF00",ncol(mes.mrna)),rep("#006680",ncol(lgm6.mrna)),rep("#00CCFF",ncol(pa.mrna))),c(rep("gray",ncol(normal.mrna)),rep("darkgreen",ncol(low.mrna)),rep("firebrick",ncol(high.mrna)),rep("#9f20f0",ncol(codel.mrna)),rep("#ffa500",ncol(classic.mrna)),rep("#FFFF00",ncol(mes.mrna)),rep("#006680",ncol(lgm6.mrna)),rep("#00CCFF",ncol(pa.mrna))))
+ha1 = HeatmapAnnotation(df = data.frame(Sample = c("Non-tumor Brain","GCIMP-low","GCIMP-high","Codel","Classic-like","Mesenchymal-like","LGm6-GBM","PA-like")), 
+                        col = list(Sample = c("Non-tumor Brain" = "gray","GCIMP-low" = "darkgreen","GCIMP-high"="firebrick","Codel"="#9f20f0","Classic-like"="#ffa500","Mesenchymal-like"="#FFFF00","LGm6-GBM"="#006680","PA-like"="#00CCFF")))
+
+#pdf("/home/thais/GBM WGBS/Brain_TSG_heatmap.pdf",width=20, height=10)
+pdf("/home/thais/Doutorado/Brain_TSG_heatmap.pdf",width=20, height=10)
+Heatmap(as.matrix(all), name = "G-CIMP specific TSG", col=greenred(75), cluster_columns = FALSE,cluster_rows = TRUE,top_annotation = ha1,row_names_gp = gpar(fontsize = 8),show_column_names = FALSE)
+dev.off()
+
+#H3K27me3 -> H1-hESC
+H3K27me3 <- read.table("/home/thais/GBM WGBS/H1hesc.H3k27me3StdPk.txt")
+colnames(H3K27me3) <- c("bin","chrom","start","end","name","score","strand","signalValue","pValue","qValue")
+
+#Oncogenes - Hotair + HOXC
+b <- subset(volcano,threshold %in% c("2","3","4","5") & Brain_OG == TRUE)
+symbol <- rownames(b)
+symbol <- symbol[30:64]
+a <- genes_hg19[genes_hg19$Associated.Gene.Name %in% symbol,]
+a <- a[with(a,order(Chromosome.Name,Gene.Start..bp.)),]
+b <- real.ctcf[real.ctcf$chrom %in% "chr12",1:3]
+
+#https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=chr12%3A54000000-55000000&hgsid=491617655_7F7c6ppoK8NfurPNTWzxvl9nZUG0
+aux.GR <- GRanges(seqnames = "chr12",ranges = IRanges(start = 54000000, end=55000000))
+a <- tudao[tudao$chrom %in% "chr12",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+a.GR <- melt(a[,c(2,4:6,10,11)],id="start")
+
+a.GR <- na.omit(a.GR)
+
+ggplot(a.GR, aes(start, value,color=variable)) +
+    geom_smooth(span=0.05,n=500,method="loess") + ylim(0,100)+
+  scale_color_manual(values = c("darkgreen","firebrick","firebrick","black","black")) +
+  scale_x_continuous(breaks = number_ticks(20)) + labs(title="Chr12: HOXC+HOTAIR")
+ggsave("/home/thais/GBM WGBS/HOXC_Hotair.png",width = 19, height = 10)
+
+ha1 = HeatmapAnnotation(df = data.frame(Sample = c("Non-tumor Brain","Non-tumor Brain","GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM")), 
+                        col = list(Sample = c("Non-tumor Brain" = "gray","GCIMP-low" = "darkgreen","GCIMP-high"="firebrick","Mesenchymal-like"="#FFFF00","LGm6-GBM"="#006680")))
+
+png("/home/thais/GBM WGBS/heatmap_HOXC_hotair.png",width=2000, height=1500)
+Heatmap(as.matrix(a[,c(10,11,4:9)]), name = "Beta-values", col=greenred(75), cluster_columns = FALSE,cluster_rows = FALSE,top_annotation = ha1,show_row_names=FALSE,show_column_names = FALSE)
+dev.off()
+
+LaminB1 <- read.table("/home/thais/GBM WGBS/LaminB1/laminB1Lads.txt")
+colnames(LaminB1) <- c("unk","chrom","start","end")
+
+library(Gviz)
+a <- AnnotationTrack(start=54000000, end=55000000,chromosome="chr12", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr12")
+
+
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+txTranscripts_v1 <- GeneRegionTrack(txdb_hg19, genome="hg19", chromosome="chr12", showId=TRUE, geneSymbol=TRUE, name="UCSC")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(txTranscripts_v1), "SYMBOL", "ENTREZID", multiVals = "first"))
+symbol(txTranscripts_v1) <- symbols[gene(txTranscripts_v1)]
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(volcano.map), aux.GR)
+b <- volcano.map[queryHits(overlaps),]
+b <- b[with(b,order(seqnames,start)),]
+txTranscripts_v1 <- GeneRegionTrack(makeGRangesFromDataFrame(b[,c("seqnames","start","end")]),symbol=as.character(b$symbol), genome="hg19", chromosome="chr12", showId=TRUE, geneSymbol=TRUE, name="Genes",fill=as.character(b$sig))
+
+aux.GR <- GRanges(seqnames = "chr12",ranges = IRanges(start = 54000000, end=55000000))
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+foo <- makeGRangesFromDataFrame(b[,c("chrom","start","end","score")],TRUE) 
+genome(foo) <- "hg19"
+foo <- DataTrack(foo,name="H3K27me3",type = "gradient")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+b[3,"end"] <- 55000000
+foo2 <- makeGRangesFromDataFrame(b,TRUE) 
+genome(foo2) <- "hg19"
+foo2 <- AnnotationTrack(foo2,name="LaminB1",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(real.ctcf), aux.GR)
+b <- real.ctcf[queryHits(overlaps),]
+ctcf <- makeGRangesFromDataFrame(b,TRUE) 
+genome(ctcf) <- "hg19"
+ctcf <- AnnotationTrack(ctcf,name="CTCF",col="black",fill="black")
+
+a <- tudao[tudao$chrom %in% "chr12",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+meth <- makeGRangesFromDataFrame(a[,c(1:6,10,11)],TRUE) 
+genome(meth) <- "hg19"
+meth <- DataTrack(meth,name="DNA methylation",type="smooth",groups=c("GCIMP.low",rep("GCIMP.high",2),rep("Non-tumor",2)),col=c("firebrick","darkgreen","grey"))
+
+
+setwd("/home/thais/chromHMM/samples/")
+enhancer <- NULL
+for(i in 1:length(list.files())){ 
+  sample <- read.table(list.files()[i],header=TRUE)
+  sample$sample <- list.files()[i]
+  overlaps <- findOverlaps(makeGRangesFromDataFrame(sample,TRUE),aux.GR)
+  if(is.null(enhancer)){
+    enhancer <- sample[queryHits(overlaps),]
+    enhancer <- enhancer[enhancer$type %in% "E4",]
+  }
+  else{
+    sample <- sample[queryHits(overlaps),]
+    sample <- sample[sample$type %in% "E4",]
+    enhancer <- rbind(enhancer,sample)
+  }
+}
+
+
+enhancer$color <- as.factor(enhancer$sample)
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[1:5],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.normal <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[6:9],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.tumor <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+
+#plotTracks(list(itrack,gtrack,txTranscripts_v1,foo,foo2), from=26500000, to=28000000, transcriptAnnotation = "symbol",collapseTranscripts = "longest")
+plotTracks(list(itrack,gtrack,txTranscripts_v1,foo2,ctcf,enh.normal,enh.tumor,meth),span=0.05,legend=TRUE,n=500)
+
+
+#Oncogenes - HIST1
+b <- subset(volcano,threshold %in% c("2","3","4","5") & volcano$Brain_OG == TRUE)
+symbol <- rownames(b)
+symbol <- symbol[30:39]
+a <- genes_hg19[genes_hg19$Associated.Gene.Name %in% symbol,]
+a <- a[with(a,order(Chromosome.Name,Gene.Start..bp.)),]
+b <- real.ctcf[real.ctcf$chrom %in% "chr6",1:3]
+
+#https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=chr6%3A25500000-28000000&hgsid=491617655_7F7c6ppoK8NfurPNTWzxvl9nZUG0
+aux.GR <- GRanges(seqnames = "chr6",ranges = IRanges(start = 25500000, end=28000000))
+a <- tudao[tudao$chrom %in% "chr6",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+a.GR <- melt(a[,c(2,4:6,10,11)],id="start")
+
+a.GR <- na.omit(a.GR)
+
+ggplot(a.GR, aes(start, value,color=variable)) +
+  geom_smooth(span=0.05,n=500,method="loess") + ylim(0,100)+
+  scale_color_manual(values = c("darkgreen","firebrick","firebrick","black","black")) +
+  scale_x_continuous(breaks = number_ticks(20)) + labs(title="Chr6: HIST1")
+ggsave("/home/thais/GBM WGBS/HIST1.png",width = 19, height = 10)
+
+ha1 = HeatmapAnnotation(df = data.frame(Sample = c("Non-tumor Brain","Non-tumor Brain","GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM")), 
+                        col = list(Sample = c("Non-tumor Brain" = "gray","GCIMP-low" = "darkgreen","GCIMP-high"="firebrick","Mesenchymal-like"="#FFFF00","LGm6-GBM"="#006680")))
+
+png("/home/thais/GBM WGBS/heatmap_HIST1.png",width=2000, height=1500)
+Heatmap(as.matrix(a[,c(10,11,4:9)]), name = "Beta-values", col=greenred(75), cluster_columns = FALSE,cluster_rows = FALSE,top_annotation = ha1,show_row_names=FALSE,show_column_names = FALSE)
+dev.off()
+
+a <- AnnotationTrack(start=25500000, end=28000000,chromosome="chr6", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr6")
+
+
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+txTranscripts_v1 <- GeneRegionTrack(txdb_hg19, genome="hg19", chromosome="chr6", showId=TRUE, geneSymbol=TRUE, name="UCSC")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(txTranscripts_v1), "SYMBOL", "ENTREZID", multiVals = "first"))
+symbol(txTranscripts_v1) <- symbols[gene(txTranscripts_v1)]
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(volcano.map), aux.GR)
+b <- volcano.map[queryHits(overlaps),]
+b <- b[with(b,order(seqnames,start)),]
+txTranscripts_v1 <- GeneRegionTrack(makeGRangesFromDataFrame(b[,c("seqnames","start","end")]),symbol=as.character(b$symbol), genome="hg19", chromosome="chr6", showId=TRUE, geneSymbol=TRUE, name="Genes",fill=as.character(b$sig))
+
+aux.GR <- GRanges(seqnames = "chr6",ranges = IRanges(start = 25500000, end=28000000))
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+foo <- makeGRangesFromDataFrame(b[,c("chrom","start","end","score")],TRUE) 
+genome(foo) <- "hg19"
+foo <- DataTrack(foo,name="H3K27me3",type = "gradient")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+foo2 <- makeGRangesFromDataFrame(b,TRUE) 
+genome(foo2) <- "hg19"
+foo2 <- AnnotationTrack(foo2,name="LaminB1",col="black",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(real.ctcf), aux.GR)
+b <- real.ctcf[queryHits(overlaps),]
+ctcf <- makeGRangesFromDataFrame(b,TRUE) 
+genome(ctcf) <- "hg19"
+ctcf <- AnnotationTrack(ctcf,name="CTCF",col="black",fill="black")
+
+a <- tudao[tudao$chrom %in% "chr6",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+meth <- makeGRangesFromDataFrame(a[,c(1:6,10,11)],TRUE) 
+genome(meth) <- "hg19"
+meth <- DataTrack(meth,name="DNA methylation",type="smooth",groups=c("GCIMP.low",rep("GCIMP.high",2),rep("Non-tumor",2)),col=c("firebrick","darkgreen","grey"))
+
+
+plotTracks(list(itrack,gtrack,txTranscripts_v1,foo,foo2,ctcf,meth),span=0.05,legend=TRUE,n=500)
+
+#HOXA
+#https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=chr7%3A26500000-28000000&hgsid=491617655_7F7c6ppoK8NfurPNTWzxvl9nZUG0
+b <- subset(volcano,threshold %in% c("2","3","4","5") & Brain_OG == TRUE)
+symbol <- rownames(b)
+symbol <- symbol[41:51]
+a <- genes_hg19[genes_hg19$Associated.Gene.Name %in% symbol,]
+a <- a[with(a,order(Chromosome.Name,Gene.Start..bp.)),]
+b <- real.ctcf[real.ctcf$chrom %in% "chr7",1:3]
+
+aux.GR <- GRanges(seqnames = "chr7",ranges = IRanges(start = 26500000, end=28000000))
+a <- tudao[tudao$chrom %in% "chr7",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+a.GR <- melt(a[,c(2,4:6,10,11)],id="start")
+
+
+a.GR <- na.omit(a.GR)
+
+ggplot(a.GR, aes(start, value,color=variable)) +
+  geom_smooth(span=0.05,n=500,method="loess") + ylim(0,100)+
+  scale_color_manual(values = c("darkgreen","firebrick","firebrick","black","black")) +
+  scale_x_continuous(breaks = number_ticks(20)) + labs(title="Chr7: HOXA")
+ggsave("/home/thais/GBM WGBS/HOXA.png",width = 19, height = 10)
+
+ha1 = HeatmapAnnotation(df = data.frame(Sample = c("Non-tumor Brain","Non-tumor Brain","GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM")), 
+                        col = list(Sample = c("Non-tumor Brain" = "gray","GCIMP-low" = "darkgreen","GCIMP-high"="firebrick","Mesenchymal-like"="#FFFF00","LGm6-GBM"="#006680")))
+
+png("/home/thais/GBM WGBS/heatmap_HOXA.png",width=2000, height=1500)
+Heatmap(as.matrix(a[,c(10,11,4:9)]), name = "Beta-values", col=greenred(75), cluster_columns = FALSE,cluster_rows = FALSE,top_annotation = ha1,show_row_names=FALSE,show_column_names = FALSE)
+dev.off()
+
+a <- AnnotationTrack(start=26500000, end=28000000,chromosome="chr7", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr7")
+
+
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+txTranscripts_v1 <- GeneRegionTrack(txdb_hg19, genome="hg19", chromosome="chr7", showId=TRUE, geneSymbol=TRUE, name="UCSC")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(txTranscripts_v1), "SYMBOL", "ENTREZID", multiVals = "first"))
+symbol(txTranscripts_v1) <- symbols[gene(txTranscripts_v1)]
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(volcano.map), aux.GR)
+b <- volcano.map[queryHits(overlaps),]
+b <- b[with(b,order(seqnames,start)),]
+txTranscripts_v1 <- GeneRegionTrack(makeGRangesFromDataFrame(b[,c("seqnames","start","end")]),symbol=as.character(b$symbol), genome="hg19", chromosome="chr7", showId=TRUE, geneSymbol=TRUE, name="Genes",fill=as.character(b$sig))
+
+aux.GR <- GRanges(seqnames = "chr7",ranges = IRanges(start = 26500000, end=28000000))
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+foo <- makeGRangesFromDataFrame(b[,c("chrom","start","end","score")],TRUE) 
+genome(foo) <- "hg19"
+foo <- DataTrack(foo,name="H3K27me3",type = "gradient")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+foo2 <- makeGRangesFromDataFrame(b,TRUE) 
+genome(foo2) <- "hg19"
+foo2 <- AnnotationTrack(foo2,name="LaminB1",col="black",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(real.ctcf), aux.GR)
+b <- real.ctcf[queryHits(overlaps),]
+ctcf <- makeGRangesFromDataFrame(b,TRUE) 
+genome(ctcf) <- "hg19"
+ctcf <- AnnotationTrack(ctcf,name="CTCF",col="black",fill="black")
+
+a <- tudao[tudao$chrom %in% "chr7",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+meth <- makeGRangesFromDataFrame(a[,c(1:6,10,11)],TRUE) 
+genome(meth) <- "hg19"
+meth <- DataTrack(meth,name="DNA methylation",type="smooth",groups=c("GCIMP.low",rep("GCIMP.high",2),rep("Non-tumor",2)),col=c("firebrick","darkgreen","grey"))
+
+
+setwd("/home/thais/chromHMM/samples/")
+enhancer <- NULL
+for(i in 1:length(list.files())){ 
+  sample <- read.table(list.files()[i],header=TRUE)
+  sample$sample <- list.files()[i]
+  overlaps <- findOverlaps(makeGRangesFromDataFrame(sample,TRUE),aux.GR)
+  if(is.null(enhancer)){
+    enhancer <- sample[queryHits(overlaps),]
+    enhancer <- enhancer[enhancer$type %in% "E4",]
+  }
+  else{
+    sample <- sample[queryHits(overlaps),]
+    sample <- sample[sample$type %in% "E4",]
+    enhancer <- rbind(enhancer,sample)
+  }
+}
+
+
+enhancer$color <- as.factor(enhancer$sample)
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[1:5],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.normal <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[6:9],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.tumor <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+
+#plotTracks(list(itrack,gtrack,txTranscripts_v1,foo,foo2), from=26500000, to=28000000, transcriptAnnotation = "symbol",collapseTranscripts = "longest")
+plotTracks(list(itrack,gtrack,txTranscripts_v1,foo2,ctcf,enh.normal,enh.tumor,meth),span=0.05,legend=TRUE,n=500)
+
+
+#HOXB 
+#https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=chr17%3A46000000-47000000&hgsid=491617655_7F7c6ppoK8NfurPNTWzxvl9nZUG0
+b <- real.ctcf[real.ctcf$chrom %in% "chr17",1:3]
+
+aux.GR <- GRanges(seqnames = "chr17",ranges = IRanges(start = 46000000, end=47000000))
+a <- tudao[tudao$chrom %in% "chr17",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+a.GR <- melt(a[,c(2,4:6,10,11)],id="start")
+
+a.GR <- na.omit(a.GR)
+
+ggplot(a.GR, aes(start, value,color=variable)) +
+  geom_smooth(span=0.05,n=500,method="loess") + ylim(0,100)+
+  scale_color_manual(values = c("darkgreen","firebrick","firebrick","black","black")) +
+  scale_x_continuous(breaks = number_ticks(20)) + labs(title="Chr17: HOXB")
+ggsave("/home/thais/GBM WGBS/HOXB.png",width = 19, height = 10)
+
+ha1 = HeatmapAnnotation(df = data.frame(Sample = c("Non-tumor Brain","Non-tumor Brain","GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM")), 
+                        col = list(Sample = c("Non-tumor Brain" = "gray","GCIMP-low" = "darkgreen","GCIMP-high"="firebrick","Mesenchymal-like"="#FFFF00","LGm6-GBM"="#006680")))
+
+png("/home/thais/GBM WGBS/heatmap_HOXA.png",width=2000, height=1500)
+Heatmap(as.matrix(a[,c(10,11,4:9)]), name = "Beta-values", col=greenred(75), cluster_columns = FALSE,cluster_rows = FALSE,top_annotation = ha1,show_row_names=FALSE,show_column_names = FALSE)
+dev.off()
+
+a <- AnnotationTrack(start=46000000, end=47000000,chromosome="chr17", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr17")
+
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+txTranscripts_v1 <- GeneRegionTrack(txdb_hg19, genome="hg19", chromosome="chr17", showId=TRUE, geneSymbol=TRUE, name="UCSC")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(txTranscripts_v1), "SYMBOL", "ENTREZID", multiVals = "first"))
+symbol(txTranscripts_v1) <- symbols[gene(txTranscripts_v1)]
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(volcano.map), aux.GR)
+b <- volcano.map[queryHits(overlaps),]
+b <- b[with(b,order(seqnames,start)),]
+txTranscripts_v1 <- GeneRegionTrack(makeGRangesFromDataFrame(b[,c("seqnames","start","end")]),symbol=as.character(b$symbol), genome="hg19", chromosome="chr17", showId=TRUE, geneSymbol=TRUE, name="Genes",fill=as.character(b$sig))
+
+aux.GR <- GRanges(seqnames = "chr17",ranges = IRanges(start = 46000000, end=47000000))
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+foo <- makeGRangesFromDataFrame(b[,c("chrom","start","end","score")],TRUE) 
+genome(foo) <- "hg19"
+foo <- DataTrack(foo,name="H3K27me3",type = "gradient")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+foo2 <- makeGRangesFromDataFrame(b,TRUE) 
+genome(foo2) <- "hg19"
+foo2 <- AnnotationTrack(foo2,name="LaminB1",col="black",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(real.ctcf), aux.GR)
+b <- real.ctcf[queryHits(overlaps),]
+ctcf <- makeGRangesFromDataFrame(b,TRUE) 
+genome(ctcf) <- "hg19"
+ctcf <- AnnotationTrack(ctcf,name="CTCF",col="black",fill="black")
+
+a <- tudao[tudao$chrom %in% "chr17",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+meth <- makeGRangesFromDataFrame(a[,c(1:6,10,11)],TRUE) 
+genome(meth) <- "hg19"
+meth <- DataTrack(meth,name="DNA methylation",type="smooth",groups=c("GCIMP.low",rep("GCIMP.high",2),rep("Non-tumor",2)),col=c("firebrick","darkgreen","grey"))
+
+
+setwd("/home/thais/chromHMM/samples/")
+enhancer <- NULL
+for(i in 1:length(list.files())){ 
+  sample <- read.table(list.files()[i],header=TRUE)
+  sample$sample <- list.files()[i]
+  overlaps <- findOverlaps(makeGRangesFromDataFrame(sample,TRUE),aux.GR)
+  if(is.null(enhancer)){
+    enhancer <- sample[queryHits(overlaps),]
+    enhancer <- enhancer[enhancer$type %in% "E4",]
+  }
+  else{
+    sample <- sample[queryHits(overlaps),]
+    sample <- sample[sample$type %in% "E4",]
+    enhancer <- rbind(enhancer,sample)
+  }
+}
+
+
+enhancer$color <- as.factor(enhancer$sample)
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[1:5],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.normal <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[6:9],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.tumor <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+
+#plotTracks(list(itrack,gtrack,txTranscripts_v1,foo,foo2), from=26500000, to=28000000, transcriptAnnotation = "symbol",collapseTranscripts = "longest")
+plotTracks(list(itrack,gtrack,txTranscripts_v1,ctcf,enh.normal,enh.tumor,meth),span=0.05,legend=TRUE,n=500)
+
+#HOXD
+#https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=chr2%3A175000000-180000000&hgsid=491617655_7F7c6ppoK8NfurPNTWzxvl9nZUG0
+b <- subset(volcano,threshold %in% c("2","3","4","5") & volcano$Brain_OG == TRUE)
+symbol <- rownames(b)
+symbol <- symbol[59:64]
+a <- genes_hg19[genes_hg19$Associated.Gene.Name %in% symbol,]
+a <- a[with(a,order(Chromosome.Name,Gene.Start..bp.)),]
+b <- real.ctcf[real.ctcf$chrom %in% "chr2",1:3]
+
+aux.GR <- GRanges(seqnames = "chr2",ranges = IRanges(start = 175000000, end=180000000))
+a <- tudao[tudao$chrom %in% "chr2",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+a.GR <- melt(a[,c(2,4:6,10,11)],id="start")
+
+a.GR <- na.omit(a.GR)
+
+ggplot(a.GR, aes(start, value,color=variable)) +
+  geom_smooth(span=0.05,n=500,method="loess") + ylim(0,100)+
+  scale_color_manual(values = c("darkgreen","firebrick","firebrick","black","black")) +
+  scale_x_continuous(breaks = number_ticks(20)) + labs(title="Chr2: HOXD")
+ggsave("/home/thais/GBM WGBS/HOXD.png",width = 19, height = 10)
+
+
+ha1 = HeatmapAnnotation(df = data.frame(Sample = c("Non-tumor Brain","Non-tumor Brain","GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM")), 
+                        col = list(Sample = c("Non-tumor Brain" = "gray","GCIMP-low" = "darkgreen","GCIMP-high"="firebrick","Mesenchymal-like"="#FFFF00","LGm6-GBM"="#006680")))
+
+png("/home/thais/GBM WGBS/heatmap_HOXD.png",width=2000, height=1500)
+Heatmap(as.matrix(a[,c(10,11,4:9)]), name = "Beta-values", col=greenred(75), cluster_columns = FALSE,cluster_rows = FALSE,top_annotation = ha1,show_row_names=FALSE,show_column_names = FALSE)
+dev.off()
+
+aux.GR <- GRanges(seqnames = "chr2",ranges = IRanges(start = 175000000, end=180000000))
+
+a <- AnnotationTrack(start=175000000, end=180000000,chromosome="chr2", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr2")
+
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+txTranscripts_v1 <- GeneRegionTrack(txdb_hg19, genome="hg19", chromosome="chr2", showId=TRUE, geneSymbol=TRUE, name="UCSC")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(txTranscripts_v1), "SYMBOL", "ENTREZID", multiVals = "first"))
+symbol(txTranscripts_v1) <- symbols[gene(txTranscripts_v1)]
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(volcano.map), aux.GR)
+b <- volcano.map[queryHits(overlaps),]
+b <- b[with(b,order(seqnames,start)),]
+txTranscripts_v1 <- GeneRegionTrack(makeGRangesFromDataFrame(b[,c("seqnames","start","end")]),symbol=as.character(b$symbol), genome="hg19", chromosome="chr2", showId=TRUE, geneSymbol=TRUE, name="Genes",fill=as.character(b$sig))
+
+aux.GR <- GRanges(seqnames = "chr2",ranges = IRanges(start = 175000000, end=180000000))
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+foo <- makeGRangesFromDataFrame(b[,c("chrom","start","end","score")],TRUE) 
+genome(foo) <- "hg19"
+foo <- DataTrack(foo,name="H3K27me3",type = "gradient")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+foo2 <- makeGRangesFromDataFrame(b,TRUE) 
+genome(foo2) <- "hg19"
+foo2 <- AnnotationTrack(foo2,name="LaminB1",col="black",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(real.ctcf), aux.GR)
+b <- real.ctcf[queryHits(overlaps),]
+ctcf <- makeGRangesFromDataFrame(b,TRUE) 
+genome(ctcf) <- "hg19"
+ctcf <- AnnotationTrack(ctcf,name="CTCF",col="black",fill="black")
+
+a <- tudao[tudao$chrom %in% "chr2",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+meth <- makeGRangesFromDataFrame(a[,c(1:6,10,11)],TRUE) 
+genome(meth) <- "hg19"
+meth <- DataTrack(meth,name="DNA methylation",type="smooth",groups=c("GCIMP.low",rep("GCIMP.high",2),rep("Non-tumor",2)),col=c("firebrick","darkgreen","grey"))
+
+setwd("/home/thais/chromHMM/samples/")
+enhancer <- NULL
+for(i in 1:length(list.files())){ 
+  sample <- read.table(list.files()[i],header=TRUE)
+  sample$sample <- list.files()[i]
+  overlaps <- findOverlaps(makeGRangesFromDataFrame(sample,TRUE),aux.GR)
+  if(is.null(enhancer)){
+    enhancer <- sample[queryHits(overlaps),]
+    enhancer <- enhancer[enhancer$type %in% "E4",]
+  }
+  else{
+    sample <- sample[queryHits(overlaps),]
+    sample <- sample[sample$type %in% "E4",]
+    enhancer <- rbind(enhancer,sample)
+  }
+}
+
+
+enhancer$color <- as.factor(enhancer$sample)
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[1:5],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.normal <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[6:9],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.tumor <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+
+#plotTracks(list(itrack,gtrack,txTranscripts_v1,foo,foo2), from=26500000, to=28000000, transcriptAnnotation = "symbol",collapseTranscripts = "longest")
+plotTracks(list(itrack,gtrack,txTranscripts_v1,foo2,ctcf,enh.normal,enh.tumor,meth),span=0.05,legend=TRUE,n=500)
+
+
+#https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=chr17%3A70640000-80910000&hgsid=494652967_5mfM89VLza7YYZT0AgIaEcACw34Y
+
+#distance to nearest CTCF
+a <- subset(real.ctcf, p.valueADJ_lowXhigh_DNAmeth < 0.05 & p.valueADJ_highXnormal_DNAmeth > 0.05 & DiffMean_lowXhigh < -30 & abs(DiffMean_highXnormal) < 30)
+
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start, end=a$end),id=a$id)
+aux <- as.data.frame(distanceToNearest(b,aux.GR))
+
+b <- as.data.frame(b)
+b$CTCF <- as.data.frame(aux.GR[aux,])$id
+
+volcano$CTCF <- 1
+volcano[as.character(b$symbol),"CTCF"] <- b$CTCF
+volcano[as.character(b$symbol),"symbol"] <- paste(b$symbol,aux$distance,sep=":")
+
+#more breaks in ggplot
+number_ticks <- function(n) {function(limits) pretty(limits, n)}
+
+#Get all gene coordinates and symbol 
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+genes <- genes(txdb_hg19)
+symbols <- unlist(mapIds(org.Hs.eg.db, genes$gene_id, "SYMBOL", "ENTREZID", multiVals = "first"))
+genes <- as.data.frame(genes)
+genes$symbol <- as.matrix(symbols)
+
+#download data from synapse (stem cells)
+library(synapseClient)
+synapseLogin('thais.sarraf@gmail.com', '')
+dest_dir = "/home/thais/Stem.Cells"
+a <- synapseQuery('SELECT id, name FROM entity WHERE parentId=="syn2822494"')
+file_ids = a$entity.id
+
+for (file_id in file_ids) {
+  file <- synGet(file_id)
+  file.copy(file@filePath, dest_dir)
+  
+}
+
+#check the expression of Hox genes in stem cells
+#data download from https://www.synapse.org/Portal.html#!Synapse:syn2701943/version/3
+SC_rnaseq <- read.table("/home/thais/Stem.Cells/Processed/HSC_rnaseq.tsv",header = TRUE)
+SC_rnaseq$ensembl <- gsub("\\..*","",as.character(SC_rnaseq[,1]))
+SC_rnaseq <- SC_rnaseq[,c(231,1,2:230)]
+a <- genes[genes$ensembl %in% as.character(SC_rnaseq$ensembl),]
+a <- as.character(a[grep("^HOX1*",a$symbol),"ensembl"])
+
+#Counts
+SC.mrna <- NULL
+id.mrna <- read.csv("/home/thais/Stem.Cells/Processed/HSC_IDs.csv")
+rownames(id.mrna) <- as.character(id.mrna$UID)
+files <- list.files("/home/thais/Stem.Cells/",pattern=".txt") #ignora as 'subpastas' que estão dentro deste diretório 
+setwd("/home/thais/Stem.Cells/")
+z <- 1 #first file
+while (!is.na(files[z])) {
+  aux <- id.mrna[gsub(".txt","",files[z]),"Barcode"]
+  if(is.null(SC.mrna)){ #read the first sample
+    SC.mrna <- read.table(files[z],sep="\t",header=FALSE) 
+    colnames(SC.mrna) <- c("geneID", gsub(".txt","",files[z]))
+  }
+  else{
+    aux = read.table(files[z], header=FALSE,sep="\t")
+    colnames(aux)[2] <- gsub(".txt","",files[z])
+    SC.mrna <- cbind(SC.mrna, aux[2])
+  }
+  z = z + 1 #next file
+}#end while
+# Stem cells -> 266 samples (removed one sample that didn't have counts, only normalized data)
+SC.mrna$geneID <- gsub("\\..*","",as.character(SC.mrna$geneID))
+rownames(SC.mrna) <- as.character(SC.mrna$geneID)
+
+#get only protein coding genes
+library(biomaRt)
+ensembl <- useMart("ensembl",dataset="hsapiens_gene_ensembl")
+gb <- getBM(attributes=c("ensembl_gene_id","gene_biotype","external_gene_name"),filters = c("ensembl_gene_id","biotype"), values=list(SC.mrna$geneID,"protein_coding"), mart=ensembl)
+
+SC.mrna <- SC.mrna[as.character(gb$ensembl_gene_id),]
+#identical(rownames(SC.mrna),gb$ensembl_gene_id) TRUE
+SC.mrna$symbol <- as.character(gb$external_gene_name)
+SC.mrna <- SC.mrna[,c(1,268,2:267)]
+
+teste <- read.table("/home/thais/Downloads/public_expressionCalls_summarized.tsv",header=TRUE)
+
+colnames(SC.mrna) <- gsub("(\\-)|(\\+)",".",colnames(SC.mrna))
+aux <- SC.mrna[,1:2]
+#parei aqui. batch effect? PREGUIÇA
+
+load("/home/thais/NormalBrain_TCGA/RNAseq/LGG_GBM_nonTumorBrain_RNAseq_SemNorm.rda")
+
+##Find genes within nuclean lamin domains and H3K7me3 mark
+aux <- gaps(makeGRangesFromDataFrame(LaminB1))[-1]
+aux <- as.data.frame(aux)
+aux <- aux[aux$start != 1,]
+aux <- aux[aux$width < 1000001,]
+aux <- findOverlaps(makeGRangesFromDataFrame(H3K27me3),makeGRangesFromDataFrame(aux),minoverlap=5000)
+aux <- H3K27me3[unique(queryHits(aux)),]
+aux <- aux[aux$score > 900,]
+
+a <- findOverlaps(makeGRangesFromDataFrame(genes),makeGRangesFromDataFrame(aux),type="within")
+symbols <- genes[queryHits(a),"symbol"]
+
+a <- volcano[rownames(volcano) %in% as.character(symbols),257:268]
+symbols <- rownames(a[a$p.value.adj < 0.05 & !is.na(a$p.value.adj),]) #399 genes
+
+a <- genes[genes$symbol %in% symbols,]
+a$seqnames <- factor(a$seqnames)
+a <- a[with(a,order(seqnames,start)),]
+
+
+##Find genes within nuclean lamin domains and H3K7me3 mark based on percentage
+aux <- gaps(makeGRangesFromDataFrame(LaminB1))[-1]
+aux <- as.data.frame(aux)
+aux <- aux[aux$start != 1,]
+aux <- aux[aux$width < 1000001,]
+hits <- findOverlaps(makeGRangesFromDataFrame(H3K27me3),makeGRangesFromDataFrame(aux))
+overlaps <- pintersect(makeGRangesFromDataFrame(H3K27me3[queryHits(hits),]), makeGRangesFromDataFrame(aux[subjectHits(hits),]))
+
+percentOverlap <- width(overlaps) / width(makeGRangesFromDataFrame(aux[subjectHits(hits),]))
+hits <- hits[percentOverlap > 0.1]
+
+a <- H3K27me3[queryHits(hits),]
+a <- a[a$score > 900,]
+
+a <- findOverlaps(makeGRangesFromDataFrame(genes),makeGRangesFromDataFrame(a),type="within")
+symbols <- genes[unique(queryHits(a)),"symbol"]
+
+a <- volcano[rownames(volcano) %in% as.character(symbols),257:268]
+symbols <- rownames(a[a$p.value.adj < 0.05 & !is.na(a$p.value.adj),]) #399 genes
+
+a <- genes[genes$symbol %in% symbols,]
+a$seqnames <- factor(a$seqnames)
+a <- a[with(a,order(seqnames,start)),]
+
+##Genes differentially expressed between LaminB1 nuclear domains
+aux <- gaps(makeGRangesFromDataFrame(LaminB1))[-1]
+aux <- as.data.frame(aux)
+aux <- aux[aux$start != 1,]
+aux <- aux[aux$width < 1000001,]
+aux <- findOverlaps(makeGRangesFromDataFrame(genes),makeGRangesFromDataFrame(aux))
+symbols <- genes[queryHits(aux),"symbol"]
+length(symbols)
+
+a <- volcano[rownames(volcano) %in% as.character(symbols),257:268]
+nrow(a)
+symbols <- rownames(a[a$p.value.adj < 0.05 & !is.na(a$p.value.adj),]) #399 genes
+length(symbols)
+
+a <- genes[genes$symbol %in% symbols,]
+a$seqnames <- factor(a$seqnames)
+a <- a[with(a,order(seqnames,start)),] #939 genes. Não dá pra ver manualmente no genome browser :(
+
+write.table(a,file="/home/thais/GBM WGBS/genes_DE_betweenLaminB1domains.txt",quote=F,row.names=F,sep="\t")
+
+##Checking the expression of genes in LaminB1 boundaries
+genes.LaminB1.info <- genes
+aux <- LaminB1
+esq <- GRanges(seqnames = as.character(aux$chrom),ranges = IRanges(start = aux$start, end=aux$start))
+esq.f <- follow(esq,makeGRangesFromDataFrame(genes.LaminB1.info))
+genes.LaminB1.info$bound.before <- NA
+genes.LaminB1.info[na.omit(esq.f),"bound.before"] <- distance(makeGRangesFromDataFrame(genes.LaminB1.info[na.omit(esq.f),]), esq[!is.na(esq.f),])
+
+dir <- GRanges(seqnames = as.character(aux$chrom),ranges = IRanges(start = aux$end, end=aux$end))
+dir.f <- precede(dir,makeGRangesFromDataFrame(genes.LaminB1.info))
+genes.LaminB1.info$bound.after <- NA
+genes.LaminB1.info[na.omit(dir.f),"bound.after"] <- distance(makeGRangesFromDataFrame(genes.LaminB1.info[na.omit(dir.f),]), dir[!is.na(dir.f),])
+
+symbols <- genes.LaminB1.info[(genes.LaminB1.info$bound.after < 1000000 & !is.na(genes.LaminB1.info$bound.after)) | (genes.LaminB1.info$bound.before < 1000000 & !is.na(genes.LaminB1.info$bound.before)),"symbol"]
+length(symbols) #2235
+
+
+
+a <- volcano[rownames(volcano) %in% as.character(symbols),257:268]
+length(symbols) #2235
+symbols <- a[a$p.value.adj < 0.05 & !is.na(a$p.value.adj),]
+length(rownames(symbols)) #645 (de 6266 DE)
+
+a <- genes[genes$symbol %in% rownames(symbols),]
+a$seqnames <- factor(a$seqnames)
+a <- a[with(a,order(seqnames,start)),] #645 genes. Não dá pra ver manualmente no genome browser :(
+
+ggplot(a, aes(x = factor(seqnames))) + geom_bar()
+
+##Check the distance between all DE genes and the nearest nuclean lamin domain
+a <- volcano[volcano$p.value.adj < 0.05 & !is.na(volcano$p.value.adj),]
+aux <- genes[genes$symbol %in% rownames(a),]
+dist <- distanceToNearest(makeGRangesFromDataFrame(aux),makeGRangesFromDataFrame(LaminB1))
+dist <- as.data.frame(dist)
+dim(dist)
+dist <- (dist[dist$distance < 1000001,])
+tail(names(sort(table(dist$subjectHits))), 1) ##index: 55 .. 29 genes
+#DNA methylation comparison between 1) DE genes: near or far nuclear lamin domain. 2) Not DE genes: near or far nuclear lamin domain
+
+#chr17:70640000-80910000
+
+aux.GR <- GRanges(seqnames = "chr17",ranges = IRanges(start = 70640000, end=80910000))
+a <- tudao[tudao$chrom %in% "chr17",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+meth <- makeGRangesFromDataFrame(a[,c(1:6,10,11)],TRUE) 
+genome(meth) <- "hg19"
+meth <- DataTrack(meth,name="DNA methylation",type="smooth",groups=c("GCIMP.low",rep("GCIMP.high",2),rep("Non-tumor",2)),col=c("firebrick","darkgreen","grey"))
+
+a <- AnnotationTrack(start=70640000, end=80910000,chromosome="chr17", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr17")
+
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+txTranscripts_v1 <- GeneRegionTrack(txdb_hg19, genome="hg19", chromosome="chr17", showId=TRUE, geneSymbol=TRUE, name="UCSC genes")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(txTranscripts_v1), "SYMBOL", "ENTREZID", multiVals = "first"))
+symbol(txTranscripts_v1) <- symbols[gene(txTranscripts_v1)]
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(volcano.map), aux.GR)
+b <- volcano.map[queryHits(overlaps),]
+b <- b[with(b,order(seqnames,start)),]
+txTranscripts_v1 <- GeneRegionTrack(makeGRangesFromDataFrame(b[,c("seqnames","start","end")]),symbol=as.character(b$symbol), genome="hg19", chromosome="chr17", showId=TRUE, geneSymbol=TRUE, name="Genes",fill=as.character(b$sig))
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+foo <- makeGRangesFromDataFrame(b[,c("chrom","start","end","score")],TRUE) 
+genome(foo) <- "hg19"
+foo <- DataTrack(foo,name="H3K27me3",type = "gradient")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+foo2 <- makeGRangesFromDataFrame(b,TRUE) 
+genome(foo2) <- "hg19"
+foo2 <- AnnotationTrack(foo2,name="LaminB1",col="black",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(real.ctcf), aux.GR)
+b <- real.ctcf[queryHits(overlaps),]
+ctcf <- makeGRangesFromDataFrame(b,TRUE) 
+genome(ctcf) <- "hg19"
+ctcf <- AnnotationTrack(ctcf,name="CTCF",col="black",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(genes), aux.GR)
+symbol <- genes[queryHits(overlaps),]
+rownames(symbol) <- as.character(symbol$symbol)
+b <- volcano[rownames(volcano) %in% as.character(symbol$symbol),]
+c <- symbol[rownames(b),]
+expr <- cbind(c[,1:3],b[1:256])
+expr <- DataTrack(makeGRangesFromDataFrame(expr,TRUE),name="Gene Expression",type="smooth",groups=c(rep("Normal",5),rep("GCIMP.low",17),rep("GCIMP.high",234)),col=c("firebrick","darkgreen","grey"))
+
+plotTracks(list(itrack,gtrack,txTranscripts_v1,foo,foo2,ctcf),legend=TRUE,span=0.001,n=550)
+plotTracks(list(itrack,gtrack,txTranscripts_v1,expr),legend=TRUE,span=0.03,n=300)
+plotTracks(list(itrack,gtrack,txTranscripts_v1,meth),legend=TRUE,span=0.001,n=550)
+
+
+#Map RNA-seq data to the gene coordinates
+volcano.map <- volcano[rownames(volcano[rna.seq.LGG.GBM.normalBrain$entrezID %in% intersect(as.character(rna.seq.LGG.GBM.normalBrain$entrezID),as.character(genes$gene_id)),]),]
+id <- rna.seq.LGG.GBM.normalBrain[rna.seq.LGG.GBM.normalBrain$entrezID %in% intersect(as.character(rna.seq.LGG.GBM.normalBrain$entrezID),as.character(genes$gene_id)),"entrezID"]
+aux <- genes[genes$gene_id %in% id,]
+rownames(aux) <- aux$gene_id
+aux <- aux[id,]
+id <- rownames(volcano.map)
+volcano.map <- cbind(aux[,c(1:3)],volcano.map)
+rownames(volcano.map) <- id
+volcano.map$sig <- "gray"
+volcano.map[(volcano.map$p.value.adj < 0.05 & !is.na(volcano.map$p.value.adj)) & volcano.map$DiffMean < 0,"sig"] <- "green"
+volcano.map[(volcano.map$p.value.adj < 0.05 & !is.na(volcano.map$p.value.adj)) & volcano.map$DiffMean > 0,"sig"] <- "red"
+
+#Centering the End of the nuclear lamin
+#a <- LaminB1[,c("chrom","start")]
+#colnames(a) <- c("chrom","centerLaminB1")
+aux <- LaminB1[,c("chrom","end")]
+colnames(aux) <- c("chrom","centerLaminB1")
+#aux <- rbind(a,aux)
+#aux$start <- aux$centerLaminB1 - 10000
+aux$end <- aux$centerLaminB1 + 10000
+aux$id <- 1:nrow(aux)
+
+a <- findOverlaps(makeGRangesFromDataFrame(tudao),makeGRangesFromDataFrame(aux,start.field="centerLaminB1"))
+sub <- cbind(tudao[queryHits(a),],aux[subjectHits(a),c("id","centerLaminB1")])
+#sub$newStart <- sub$start-sub$centerLaminB1
+sub$newEnd <- sub$end-sub$centerLaminB1
+
+c <- melt(sub[,c(4:11, 21,23)],id=c("id","newEnd"))
+c <- na.omit(c)
+
+ggplot(c,aes(x=newEnd,y=value,color=variable))  +
+  geom_smooth(span=0.05,n=500,method="loess") + ylim(0,100)  +
+  scale_x_continuous(breaks=arithSeq(0,10000))         +
+  #xlim(-200,200) +
+  scale_color_manual(values=c("darkgreen","firebrick","firebrick","#ffa500","#ffa500","cyan","gray","gray"), 
+                     labels=c("GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM","Non-tumor Brain","Non-tumor Brain"),
+                     name="Legend")
+
+#EN1 - enhancer (adicionar no Gviz uma 'barrinha' pra cada amostra com a posição dos enhancers)
+setwd("/home/thais/chromHMM/samples/")
+enhancer <- NULL
+aux.GR <- GRanges(seqnames = "chr2",ranges = IRanges(start = 118600000, end=120600000))
+for(i in 1:length(list.files())){ 
+  sample <- read.table(list.files()[i],header=TRUE)
+  sample$sample <- list.files()[i]
+  overlaps <- findOverlaps(makeGRangesFromDataFrame(sample,TRUE),aux.GR)
+  if(is.null(enhancer)){
+    enhancer <- sample[queryHits(overlaps),]
+    enhancer <- enhancer[enhancer$type %in% "E4",]
+  }
+  else{
+    sample <- sample[queryHits(overlaps),]
+    sample <- sample[sample$type %in% "E4",]
+    enhancer <- rbind(enhancer,sample)
+  }
+}
+enhancer$width <- enhancer$end - enhancer$start
+enhancer$color <- as.factor(enhancer$sample)
+
+setwd("/home/thais/chromHMM/samples/")
+enhancer <- NULL
+aux.GR <- GRanges(seqnames = "chr2",ranges = IRanges(start = 118600000, end=120600000))
+for(i in 1:length(list.files())){ 
+  sample <- read.table(list.files()[i],header=TRUE)
+  sample$sample <- list.files()[i]
+  overlaps <- findOverlaps(makeGRangesFromDataFrame(sample,TRUE),aux.GR)
+  if(is.null(enhancer)){
+    enhancer <- sample[queryHits(overlaps),]
+    enhancer <- enhancer[enhancer$type %in% "E4",]
+  }
+  else{
+    sample <- sample[queryHits(overlaps),]
+    sample <- sample[sample$type %in% "E4",]
+    enhancer <- rbind(enhancer,sample)
+  }
+}
+
+a <- AnnotationTrack(start=118700000, end=120600000,chromosome="chr2", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr2")
+
+aux.GR <- GRanges(seqnames = "chr2",ranges = IRanges(start = 118700000, end=120600000))
+overlaps <- findOverlaps(makeGRangesFromDataFrame(volcano.map), aux.GR)
+b <- volcano.map[queryHits(overlaps),]
+b <- b[with(b,order(seqnames,start)),]
+txTranscripts_v1 <- GeneRegionTrack(makeGRangesFromDataFrame(b[,c("seqnames","start","end")]),symbol=as.character(b$symbol), genome="hg19", chromosome="chr2", showId=TRUE, geneSymbol=TRUE, name="Genes",fill=as.character(b$sig))
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+foo <- makeGRangesFromDataFrame(b[,c("chrom","start","end","score")],TRUE) 
+genome(foo) <- "hg19"
+foo <- DataTrack(foo,name="H3K27me3",type = "gradient",stacking="dense")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+foo2 <- makeGRangesFromDataFrame(b,TRUE) 
+genome(foo2) <- "hg19"
+foo2 <- AnnotationTrack(foo2,name="LaminB1",col="black",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(real.ctcf), aux.GR)
+b <- real.ctcf[queryHits(overlaps),]
+ctcf <- makeGRangesFromDataFrame(b,TRUE) 
+genome(ctcf) <- "hg19"
+ctcf <- AnnotationTrack(ctcf,name="CTCF",col="black",fill="black",stacking="dense")
+
+a <- tudao[tudao$chrom %in% "chr2",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+meth <- makeGRangesFromDataFrame(a[,c(1:6,10,11)],TRUE) 
+genome(meth) <- "hg19"
+meth <- DataTrack(meth,name="DNA methylation",type="smooth",groups=c("GCIMP.low",rep("GCIMP.high",2),rep("Non-tumor",2)),col=c("firebrick","darkgreen","grey"))
+
+enhancer$color <- as.factor(enhancer$sample)
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[1:5],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.normal <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[6:9],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.tumor <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+
+plotTracks(list(itrack,gtrack,txTranscripts_v1,foo,foo2,ctcf,enh.normal,enh.tumor,meth),span=0.05,legend=TRUE,n=500)
+
+#Poster - SNO 2016
+a <- LGG.GBM[,"TCGA-06-0128"]*100
+cor.test(tudao[,4],a,method="pearson") #0.93
+
+a <- LGG.GBM[,"TCGA-16-1460"]*100
+cor.test(tudao[,5],a,method="pearson") #0.95
+
+a <- LGG.GBM[,"TCGA-19-1788"]*100
+cor.test(tudao[,6],a,method="pearson") #0.95
+
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+library(org.Hs.eg.db)
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+genes <- genes(txdb_hg19)
+symbols <- unlist(mapIds(org.Hs.eg.db, genes$gene_id, "SYMBOL", "ENTREZID", multiVals = "first"))
+genes <- as.data.frame(genes)
+genes$symbol <- as.matrix(symbols)
+
+gene.GR <- makeGRangesFromDataFrame(genes,TRUE)
+
+a <- subset(real.ctcf, p.valueADJ_lowXhigh_DNAmeth < 0.05 & p.valueADJ_highXnormal_DNAmeth > 0.05 & DiffMean_lowXhigh < -30 & abs(DiffMean_highXnormal) < 30)
+
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start-1000000, end=a$start))
+aux2.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$end, end=a$end+1000000))
+aux.GR <- c(aux.GR,aux2.GR)
+gene_id <- as.data.frame(subsetByOverlaps(gene.GR,aux.GR))$gene_id
+
+##### DNA methylation at promoter regions of differentially expressed genes
+id <- volcano.map[volcano.map$threshold %in% 3, "entrezID"] #2 = downregulated in G-CIMP-low ; 3 = upregulated in G-CIMP-low
+aux <- genes[id,]
+#aux$center <- aux$start - 10000
+#aux.GR <- GRanges(seqnames = as.character(aux$seqnames),ranges = IRanges(start = aux$center,end = aux$start),symbol=aux$symbol,entrezID=aux$gene_id)
+aux.GR <- promoters(makeGRangesFromDataFrame(aux,TRUE),upstream = 8000,downstream = 500)
+aux <- as.data.frame(aux.GR)
+aux$center <- aux$start
+a <- findOverlaps(makeGRangesFromDataFrame(tudao),aux.GR)
+sub <- cbind(tudao[queryHits(a),],aux[subjectHits(a),c("symbol","gene_id","center")])
+sub$newStart <- sub$start-sub$center
+sub$mean_normalBrain <- apply(sub[,c("percentMeth.59","percentMeth.60")],1,mean,na.rm=TRUE)
+sub$gene_id <- as.factor(sub$gene_id)
+c <- melt(sub[,c(4:11, 22,24)],id=c("gene_id","newStart"))
+c <- na.omit(c)
+
+ggplot(c,aes(x=newStart,y=value,color=variable))  +
+  geom_smooth(span=0.05,n=500,method="loess") + 
+  ylim(0,100)  +
+  scale_color_manual(values=c("darkgreen","firebrick","firebrick","#ffa500","#ffa500","cyan","gray","gray"),
+                     labels=c("GCIMP-low","GCIMP-high","GCIMP-high","Mesenchymal-like","Mesenchymal-like","LGm6-GBM","Non-tumor Brain","Non-tumor Brain"),
+                     name="Legend")
+
+a <- melt(pd[,"tss"])
+a <- within(a, value <- factor(value, 
+                                  levels=names(sort(table(value), decreasing=TRUE))))
+
+ggplot(a,aes(value,fill=value)) + geom_bar() + theme(legend.position="none",axis.text.x = element_text(angle = 45, hjust = 1,size=10))
+
+#Enhancers near DM CTCFs (n=24)
+a <- subset(real.ctcf, p.valueADJ_lowXhigh_DNAmeth < 0.05 & p.valueADJ_highXnormal_DNAmeth > 0.05 & DiffMean_lowXhigh < -30 & abs(DiffMean_highXnormal) < 30)
+
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start-500000, end=a$end+500000))
+cpg.ctcf <- as.data.frame(subsetByOverlaps(makeGRangesFromDataFrame(tudao,TRUE),aux.GR))
+
+hc.m.gain <- as.hclust(agnes(daisy(data.frame(cpg.ctcf[,14:22]), metric="gower"), method="ward"))
+cpg.ctcf.order <- cpg.ctcf[hc.m.gain$order,]
+rownames(cpg.ctcf.order) <- NULL
+cpg.ctcf.order$teste <- rownames(cpg.ctcf.order)
+cpg.ctcf.order <- (melt(cpg.ctcf.order,id="teste"))
+cpg.ctcf.order$teste <- as.factor(cpg.ctcf.order$teste)
+cpg.ctcf.order$teste <- factor(cpg.ctcf.order$teste, levels=rownames(cpg.ctcf[hc.m.gain$order,]))
+
+ggplot(cpg.ctcf.order, aes(y=teste,x=variable)) + 
+  geom_tile(aes(fill=factor(value))) +
+  scale_fill_manual(values=c("coral1","chartreuse4","cadetblue1","brown3","darkorchid1"),guide = guide_legend(title = "Legend")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),axis.text.y = element_blank())
+
+
+
+setwd("/home/thais/chromHMM/samples/")
+enhancer <- NULL
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start-500000, end=a$end+500000))
+for(i in 1:length(list.files())){ 
+  sample <- read.table(list.files()[i],header=TRUE)
+  sample$sample <- list.files()[i]
+  overlaps <- findOverlaps(makeGRangesFromDataFrame(sample,TRUE),aux.GR)
+  if(is.null(enhancer)){
+    enhancer <- sample[queryHits(overlaps),]
+    enhancer <- enhancer[enhancer$type %in% "E4",]
+  }
+  else{
+    sample <- sample[queryHits(overlaps),]
+    sample <- sample[sample$type %in% "E4",]
+    enhancer <- rbind(enhancer,sample)
+  }
+}
+enhancer$width <- enhancer$end - enhancer$start
+enhancer$color <- as.factor(enhancer$sample)
+
+cpg.ctcf$mean_GCIMP.high <- apply(cpg.ctcf[,c("percentMeth.1460","percentMeth.1788")],1,mean,na.rm=TRUE)
+cpg.ctcf$DiffMean <- cpg.ctcf$percentMeth.0128 - cpg.ctcf$mean_GCIMP.high
+cpg.ctcf <- as.data.frame(subsetByOverlaps(makeGRangesFromDataFrame(tudao,TRUE),makeGRangesFromDataFrame(enhancer,TRUE)))
+
+cpg.ctcf$enhancer <- apply(cpg.ctcf[,14:22],1,function(i) sum(i %in% c("E4")) > 8)
+aux <- subset(cpg.ctcf, abs(DiffMean) > 50) #2039 down no low, 51 up
+
+heatmap.plus(as.matrix(aux[,c(6:8,12:13)]),
+             Colv=NA,
+             col=jet.colors(75),
+             cexCol = 0.5,
+             labRow = NA,
+             #labCol = NA,
+             scale = "none")
+
+#Genes near DM CTCFs (n=24)
+aux.GR <- GRanges(seqnames = as.character(a$chrom),ranges = IRanges(start = a$start-500000, end=a$end+500000))
+aux <- as.data.frame(subsetByOverlaps(makeGRangesFromDataFrame(volcano.map,TRUE),aux.GR))
+write.table(rownames(aux[aux$p.value.adj < 0.05 & !is.na(aux$p.value.adj) & aux$DiffMean > 0,]),file="/home/thais/Doutorado/Gene_DE_near_CTCF_up.txt",quote=F,row.names=F,sep="\t")
+write.table(rownames(aux[aux$p.value.adj < 0.05 & !is.na(aux$p.value.adj) & aux$DiffMean < 0,]),file="/home/thais/Doutorado/Gene_DE_near_CTCF_down.txt",quote=F,row.names=F,sep="\t")
+
+#chr 4
+a <- AnnotationTrack(start=174000000, end=175000000,chromosome="chr4", genome="hg19", name="AnnotationTrack")
+gtrack <- GenomeAxisTrack()
+itrack <- IdeogramTrack(genome = "hg19", chromosome = "chr4")
+
+
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb_hg19 <- TxDb.Hsapiens.UCSC.hg19.knownGene
+txTranscripts_v1 <- GeneRegionTrack(txdb_hg19, genome="hg19", chromosome="chr4", showId=TRUE, geneSymbol=TRUE, name="UCSC")
+symbols <- unlist(mapIds(org.Hs.eg.db, gene(txTranscripts_v1), "SYMBOL", "ENTREZID", multiVals = "first"))
+symbol(txTranscripts_v1) <- symbols[gene(txTranscripts_v1)]
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(volcano.map), aux.GR)
+b <- volcano.map[queryHits(overlaps),]
+b <- b[with(b,order(seqnames,start)),]
+txTranscripts_v1 <- GeneRegionTrack(makeGRangesFromDataFrame(b[,c("seqnames","start","end")]),symbol=as.character(b$symbol), genome="hg19", chromosome="chr4", showId=TRUE, geneSymbol=TRUE, name="Genes",fill=as.character(b$sig))
+
+aux.GR <- GRanges(seqnames = "chr4",ranges = IRanges(start = 174000000, end=175000000))
+overlaps <- findOverlaps(makeGRangesFromDataFrame(H3K27me3), aux.GR)
+b <- H3K27me3[queryHits(overlaps),]
+foo <- makeGRangesFromDataFrame(b[,c("chrom","start","end","score")],TRUE) 
+genome(foo) <- "hg19"
+foo <- DataTrack(foo,name="H3K27me3",type = "gradient")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(LaminB1), aux.GR)
+b <- LaminB1[queryHits(overlaps),]
+foo2 <- makeGRangesFromDataFrame(b,TRUE) 
+genome(foo2) <- "hg19"
+foo2 <- AnnotationTrack(foo2,name="LaminB1",col="black",fill="black")
+
+overlaps <- findOverlaps(makeGRangesFromDataFrame(real.ctcf), aux.GR)
+b <- real.ctcf[queryHits(overlaps),]
+ctcf <- makeGRangesFromDataFrame(b,TRUE) 
+genome(ctcf) <- "hg19"
+ctcf <- AnnotationTrack(ctcf,name="CTCF",col="black",fill="black")
+
+a <- tudao[tudao$chrom %in% "chr4",]
+a.GR <- makeGRangesFromDataFrame(a,TRUE)
+overlaps <- findOverlaps(a.GR, aux.GR)
+a <- a[queryHits(overlaps),]
+meth <- makeGRangesFromDataFrame(a[,c(1:6,10,11)],TRUE) 
+genome(meth) <- "hg19"
+meth <- DataTrack(meth,name="DNA methylation",type="smooth",groups=c("GCIMP.low",rep("GCIMP.high",2),rep("Non-tumor",2)),col=c("firebrick","darkgreen","grey"))
+
+
+setwd("/home/thais/chromHMM/samples/")
+enhancer <- NULL
+for(i in 1:length(list.files())){ 
+  sample <- read.table(list.files()[i],header=TRUE)
+  sample$sample <- list.files()[i]
+  overlaps <- findOverlaps(makeGRangesFromDataFrame(sample,TRUE),aux.GR)
+  if(is.null(enhancer)){
+    enhancer <- sample[queryHits(overlaps),]
+    enhancer <- enhancer[enhancer$type %in% "E4",]
+  }
+  else{
+    sample <- sample[queryHits(overlaps),]
+    sample <- sample[sample$type %in% "E4",]
+    enhancer <- rbind(enhancer,sample)
+  }
+}
+
+
+enhancer$color <- as.factor(enhancer$sample)
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[1:5],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.normal <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+b <- enhancer[enhancer$color %in% levels(enhancer$color)[6:9],]
+levels(b$color) <- c(rep("purple",5),rep("pink",4))
+enh.tumor <- AnnotationTrack(makeGRangesFromDataFrame(b,TRUE),name="Enhancer",fill=as.character(b$color),col=as.character(b$color),stacking="dense")
+
+plotTracks(list(itrack,gtrack,txTranscripts_v1,foo2,ctcf,enh.normal,enh.tumor,meth),span=0.05,legend=TRUE,n=500,from=174000000,to=175000000)
+
+#use another genome version with biomaRt
+library(biomaRt)
+ensembl=useMart(host='grch37.ensembl.org', biomart='ENSEMBL_MART_ENSEMBL',dataset="hsapiens_gene_ensembl")
+a <- listAttributes(ensembl)
+a[grep("entrez", a$name),]
+
+dframe <- getBM(attributes=c("entrezgene", "percentage_gc_content","start_position","end_position"), filters=c("entrezgene"), values=genes$gene_id, mart=ensembl)
+dframe$geneLenght <- dframe$end_position - dframe$start_position
+
+a <- low[low$Chromosome %in% "X",-c(1:4)]
+a <- apply(a,1,mean,na.rm=T)
+b <- high[high$Chromosome %in% "X",-c(1:4)]
+b <- apply(b,1,mean,na.rm=T)
+
+a <- TCGA.06.0128[TCGA.06.0128$chrom %in% "chr4",4]
+b <- tudao[tudao$chrom %in% "chr4",5:6]
+b <- apply(b,1,mean,na.rm=T)
+a <- data.frame(high=b,low=a)
+heatpairs(as.matrix(a))
